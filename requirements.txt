@@ -1,0 +1,6 @@
+tensorflow>=2.4.1
+numpy
+cached_property
+tqdm
+tabulate
+pandas
