@@ -20,7 +20,7 @@ here = pathlib.Path(__file__).parent.resolve()
 
 setup(
     name='tf-seq2seq-losses',
-    version="0.1.1",
+    version="0.1.3",
     description='Tensorflow implementations for seq2seq Machine Learning model loss functions',
     long_description=(here / 'README.md').read_text(encoding='utf-8'),
     long_description_content_type='text/markdown',
@@ -30,7 +30,7 @@ setup(
     license='Apache 2.0',
     license_files=('LICENSE',),
     packages=['tf_seq2seq_losses'],
-    install_requires=["tensorflow>=2.4.1", "numpy", "cached_property"],
+    install_requires=["tensorflow>=2.3.0", "numpy", "cached_property"],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',

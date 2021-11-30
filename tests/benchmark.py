@@ -29,6 +29,9 @@ from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
 
 
+logging.getLogger().setLevel(logging.INFO)
+
+
 class TestBenchmarkCtcLosses(unittest.TestCase):
     def setUp(self) -> None:
         self.batch_size = 256
@@ -155,7 +158,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
                 tape.watch([logits])
                 output = loss_fn(labels, logits, label_length, logit_length)
                 loss = tf.reduce_mean(output)
-                gradient = tape.gradient(loss, sources=logits)
+            gradient = tape.gradient(loss, sources=logits)
             return loss, gradient
 
         return func_graph

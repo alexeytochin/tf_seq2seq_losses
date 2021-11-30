@@ -211,7 +211,7 @@ class TestClassicCtcLoss(TestCtcLoss):
                 tape.watch([logits])
                 loss_samplewise = classic_ctc_loss(labels, logits, label_length, logit_length, 0)
                 loss = tf.reduce_sum(loss_samplewise)
-                gradient = tape.gradient(loss, sources=logits)
+            gradient = tape.gradient(loss, sources=logits)
             return loss_samplewise, gradient
 
         loss_samplewise, gradient = func()
@@ -257,8 +257,8 @@ class TestClassicCtcLoss(TestCtcLoss):
                 logit_length = input_dict["logit_length"],
                 blank_index = 0,
             )
-            tf_version_gradient = tape.gradient(tf_loss, input_dict["logits"])
-            classic_version_gradient = tape.gradient(testing_loss, input_dict["logits"])
+        tf_version_gradient = tape.gradient(tf_loss, input_dict["logits"])
+        classic_version_gradient = tape.gradient(testing_loss, input_dict["logits"])
 
         self.assertTensorsAlmostEqual(tf_version_gradient, classic_version_gradient, 4)
 
@@ -283,7 +283,7 @@ class TestClassicCtcLoss(TestCtcLoss):
         with tf.GradientTape() as tape:
             tape.watch([logits])
             loss = loss_fn(logits[0])
-            gradient_analytic = tape.gradient(loss, sources=logits)
+        gradient_analytic = tape.gradient(loss, sources=logits)
 
         self.assertTensorsAlmostEqual(gradient_numerical, gradient_analytic, 2)
 

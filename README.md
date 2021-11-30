@@ -61,11 +61,11 @@ batch_size = 1
 num_token = 3 # = 2 tokens + blank
 logit_length = 5
 loss = classic_ctc_loss(
-    labels = tf.constant([[1,2,2,1]], dtype=tf.int32),
-    logits = tf.zeros(shape=[batch_size, logit_length, num_token], dtype=tf.float32),
-    label_length = tf.constant([4], dtype=tf.int32),
-    logit_length = tf.constant([logit_length], dtype=tf.int32),
-    blank_index = 0,
+    labels=tf.constant([[1,2,2,1]], dtype=tf.int32),
+    logits=tf.zeros(shape=[batch_size, logit_length, num_token], dtype=tf.float32),
+    label_length=tf.constant([4], dtype=tf.int32),
+    logit_length=tf.constant([logit_length], dtype=tf.int32),
+    blank_index=0,
 )
 ```
 
@@ -77,8 +77,8 @@ The bottleneck is the iterations over the logit length in order to calculate
 [paper](file:///home/alexey/Downloads/Connectionist_temporal_classification_Labelling_un.pdf)
 ). Expected gradient GPU calculation time is linear over logit length. 
 
-## Known Probelems:
-1. Warning:
+## Known Probelems
+Warning:
 > AutoGraph could not transform <function classic_ctc_loss at ...> and will run it as-is.
 Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output.
 

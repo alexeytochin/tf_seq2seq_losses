@@ -199,7 +199,7 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         with tf.GradientTape() as tape:
             tape.watch([logits])
             loss = loss_fn(logits[0])
-            gradient_analytic = tape.gradient(loss, sources=logits)
+        gradient_analytic = tape.gradient(loss, sources=logits)
 
         self.assertTensorsAlmostEqual(gradient_numerical, gradient_analytic, 1)
 
