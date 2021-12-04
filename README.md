@@ -16,11 +16,11 @@ Official CTC loss implementation
 is dramatically slow. 
 The proposed implementation is approximately 30 times faster as it follows form the benchmark:
 
-| Name                       | forward time          | gradient calculation time                 
-|:---:                       |:---:                  |:---:             
-| tf.nn.ctc_loss             | 13.2 ± 0.02           | 10.4 ± 3.
-| classic_ctc_loss           | 0.138 ± 0.006         | 0.28 ± 0.01
-| simple_ctc_loss            | 0.0531 ± 0.003        | 0.119 ± 0.004
+|            Name             |      forward time      |  gradient calculation time  |                 
+|:---------------------------:|:----------------------:|:---------------------------:|
+|       tf.nn.ctc_loss        |      13.2 ± 0.02       |          10.4 ± 3.          |
+|      classic_ctc_loss       |     0.138 ± 0.006      |         0.28 ± 0.01         |
+|       simple_ctc_loss       |     0.0531 ± 0.003     |        0.119 ± 0.004        |
 
 (Tested on single GPU: GeForce GTX 970,  Driver Version: 460.91.03, CUDA Version: 11.2). See 
 [`benchmark.py`](tests/performance_test.py)
