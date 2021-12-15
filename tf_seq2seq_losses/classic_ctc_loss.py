@@ -19,7 +19,7 @@ from cached_property import cached_property
 import tensorflow as tf
 
 from tf_seq2seq_losses.base_loss import BaseCtcLossData, ctc_loss
-from tf_seq2seq_losses.tools import logsumexp, apply_logarithmic_mask, unfold
+from tf_seq2seq_losses.tools import logsumexp, apply_logarithmic_mask, unfold, expand_many_dims
 
 
 def classic_ctc_loss(
@@ -27,7 +27,7 @@ def classic_ctc_loss(
         logits: tf.Tensor,
         label_length: tf.Tensor,
         logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor]=0,
+        blank_index: Union[int, tf.Tensor] = 0,
 ) -> tf.Tensor:
     """Computes CTC (Connectionist Temporal Classification) loss from
     http://www.cs.toronto.edu/~graves/icml_2006.pdf.
@@ -106,26 +106,13 @@ class ClassicCtcLossData(BaseCtcLossData):
         sum_s sum_l exp alpha_{b,t,l,s} * exp beta_{b,t,l,s} = loss_{b}, for any b and t
     """
     @cached_property
-    def non_blank_grad_term(self) -> tf.Tensor:
-        """Calculates gradient term log [sum exp(alpha) * exp(log_proba) * exp(beta)]
-        for non-blank tokens.
-
-        There are to terms to sum up:
-            1. Horizontal steps from repeated token: open alpha state to open beta state
-            2. Diagonal steps from either open or closed state to an open state
-
-        Returns: tf.Tensor, shape = [batch_size, max_logit_length, num_tokens]
-        The values at [:, :, self._token_index] are to be ignored
-        """
-        return logsumexp(self.horizontal_non_blank_grad_term, self.diagonal_non_blank_grad_term)
-
-    @cached_property
     def diagonal_non_blank_grad_term(self) -> tf.Tensor:
         """ shape = [batch_size, max_logit_length, num_tokens] """
         input_tensor = \
-            self.alpha[:, :-1]\
-            + self.any_to_open_diagonal_step_log_proba\
+            self.alpha[:, :-1] \
+            + self.any_to_open_diagonal_step_log_proba \
             + tf.roll(self.beta[:, 1:, :, 1:], shift=-1, axis=2)
+        # shape = [batch_size, max_logit_length, max_label_length + 1, states]
         act = tf.reduce_logsumexp(
             input_tensor=input_tensor,
             axis=3,
@@ -147,20 +134,7 @@ class ClassicCtcLossData(BaseCtcLossData):
         return horizontal_non_blank_grad_term
 
     @cached_property
-    def blank_grad_term(self) -> tf.Tensor:
-        """Calculates gradient term log [sum exp(alpha) * exp(log_proba) * exp(beta)] for the blank token.
-
-        Returns: tf.Tensor, shape = [batch_size, max_logit_length]
-        """
-        # Either open or closed state from alpha and only closed state from beta
-        alpha_beta_term = tf.reduce_logsumexp(self.alpha[:, :-1], 3) + self.beta[:, 1:, :, 0]
-        # shape = [batch_size, logit_length, label_length + 1]
-        horizontal_blank_grad_term = self.blank_log_proba + tf.reduce_logsumexp(alpha_beta_term, axis=2)
-        # shape = [batch_size, max_logit_length]
-        return horizontal_blank_grad_term
-
-    @cached_property
-    def log_loss(self) -> tf.Tensor:
+    def loss(self) -> tf.Tensor:
         """ shape = [batch_size] """
         params = tf.reduce_logsumexp(self.alpha[:, -1], -1)
         # shape = [batch_size, max_label_length + 1]
@@ -170,6 +144,120 @@ class ClassicCtcLossData(BaseCtcLossData):
             batch_dims=1,
         )
         return loss
+
+    @cached_property
+    def gamma(self) -> tf.Tensor:
+        """ shape = [
+                batch_size,
+                max_logit_length + 1,
+                max_label_length + 1,
+                state,
+                max_logit_length + 1,
+                max_label_length + 1,
+                state,
+            ],
+        """
+        # This is to avoid InaccessibleTensorError in graph mode
+        _, _, _ = self.horizontal_step_log_proba, self.any_to_open_diagonal_step_log_proba, self.diagonal_gamma
+
+        gamma_forward_transposed = unfold(
+            init_tensor=self.diagonal_gamma,
+            # init_tensor=tf.tile(self.diagonal_gamma, [self.batch_size, self.max_logit_length_plus_one, 1, 1, 1, 1]),
+            iterfunc=self.gamma_step,
+            d_i=1,
+            num_iters=self.max_logit_length,
+            element_shape=tf.TensorShape([None, None, None, None, None, None]),
+            name="gamma_1",
+        )
+        # shape = [max_logit_length + 1, batch_size, max_logit_length + 1, max_label_length + 1, state,
+        #   max_label_length + 1, state]
+
+        gamma_forward = tf.transpose(gamma_forward_transposed, [1, 2, 3, 4, 0, 5, 6])
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state,
+        #   max_logit_length + 1, max_label_length + 1, state]
+
+        mask = expand_many_dims(
+            input=tf.linalg.band_part(tf.ones(shape=[self.max_logit_length_plus_one] * 2, dtype=tf.bool), 0, -1),
+            axes=[0, 2, 3, 5, 6]
+        )
+        # shape = [1, max_logit_length + 1, 1, 1, max_logit_length + 1, 1, 1]
+        gamma = apply_logarithmic_mask(gamma_forward, mask)
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state,
+        #   max_logit_length + 1, max_label_length + 1, state]
+
+        return gamma
+
+    def gamma_step(
+        self,
+        previous_slice: tf.Tensor,
+        i: tf.Tensor,
+    ) -> tf.Tensor:
+        """Args:
+            previous_slice: tf.Tensor,
+                            shape = [batch_size, max_logit_length + 1, max_label_length + 1, state,
+                                max_label_length + 1, state]
+            i:              tf.Tensor,
+                            shape = [], 0 <= i < max_logit_length + 1
+
+        Returns:            tf.Tensor,
+                            shape = [batch_size, max_logit_length + 1, max_label_length + 1, state,
+                                max_label_length + 1, state]
+        """
+        horizontal_step_states = \
+            expand_many_dims(self.horizontal_step_log_proba[:, i], axes=[1, 2, 3]) \
+            + tf.expand_dims(previous_slice, 5)
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state,
+        #          max_label_length + 1, next_state, previous_state]
+        horizontal_step = tf.reduce_logsumexp(horizontal_step_states, axis=6)
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1, state]
+
+        diagonal_step_log_proba = tf.reduce_logsumexp(
+            expand_many_dims(self.any_to_open_diagonal_step_log_proba[:, i], axes=[1, 2, 3]) + previous_slice,
+            axis=5
+        )
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1]
+
+        # We move by one token because it is a diagonal step
+        moved_diagonal_step_log_proba = tf.roll(diagonal_step_log_proba, shift=1, axis=4)
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1]
+
+        # Out state is always open:
+        diagonal_step = tf.pad(
+            tensor=tf.expand_dims(moved_diagonal_step_log_proba, 5),
+            paddings=[[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 0]],
+            constant_values=-np.inf
+        )
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1, state]
+        new_gamma_slice = logsumexp(
+            x=horizontal_step,
+            y=diagonal_step,
+        )
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1, state]
+
+        condition = tf.reshape(tf.range(self.max_logit_length_plus_one) <= i, shape=[1, -1, 1, 1, 1, 1])
+        # shape = [1, max_logit_length + 1, 1, 1, 1, 1, 1]
+        output_slice = tf.where(
+            condition=condition,
+            x=new_gamma_slice,
+            y=self.diagonal_gamma,
+        )
+        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, state, max_label_length + 1, state]
+
+        return output_slice
+
+    @cached_property
+    def diagonal_gamma(self) -> tf.Tensor:
+        """ shape = [batch_size, max_logit_length_plus_one, max_label_length + 1, state,
+                     max_label_length + 1, state]
+        """
+        diagonal_gamma = tf.math.log(
+            tf.reshape(
+                tensor=tf.eye(self.max_label_length_plus_one * 2, dtype=tf.float32),
+                shape=[1, 1, self.max_label_length_plus_one, 2, self.max_label_length_plus_one, 2]
+            )
+        )
+        diagonal_gamma = tf.tile(diagonal_gamma, [self.batch_size, self.max_logit_length_plus_one, 1, 1, 1, 1])
+        return diagonal_gamma
 
     @cached_property
     def beta(self) -> tf.Tensor:
@@ -193,27 +281,12 @@ class ClassicCtcLossData(BaseCtcLossData):
         Returns:    tf.Tensor,  shape = [batch_size, max_logit_length + 1, max_label_length + 1, state],
                     dtype = tf.float32
         """
-        horizontal_step_log_proba = self.horizontal_step_log_proba
-        any_to_open_diagonal_step_log_proba = self.any_to_open_diagonal_step_log_proba
-
-        def beta_step(previous_slice: tf.Tensor, i: tf.Tensor) -> tf.Tensor:
-            """ shape = [batch_size, max_label_length + 1, state] """
-            horizontal_step = \
-                tf.reduce_logsumexp(horizontal_step_log_proba[:, i] + tf.expand_dims(previous_slice, 3), 2)
-            # shape = [batch_size, max_label_length + 1, state]
-            diagonal_step = \
-                any_to_open_diagonal_step_log_proba[:, i] + tf.roll(previous_slice[:, :, 1:], shift=-1, axis=1)
-            # shape = [batch_size, max_label_length + 1, state]
-            new_beta_slice = logsumexp(
-                x=horizontal_step,  # shape = [batch_size, max_label_length + 1, state]
-                y=diagonal_step,    # shape = [batch_size, max_label_length + 1, state]
-            )
-            # shape = [batch_size, max_label_length + 1, state]
-            return new_beta_slice
+        # This is to avoid InaccessibleTensorError in graph mode
+        _, _ = self.horizontal_step_log_proba, self.any_to_open_diagonal_step_log_proba
 
         beta = unfold(
             init_tensor=self.last_beta_slice,
-            iterfunc=beta_step,
+            iterfunc=self.beta_step,
             d_i=-1,
             num_iters=self.max_logit_length,
             element_shape=tf.TensorShape([None, None, 2]),
@@ -222,10 +295,25 @@ class ClassicCtcLossData(BaseCtcLossData):
         # shape = [logit_length + 1, batch, label_length + 1, state]
         return tf.transpose(beta, [1, 0, 2, 3])
 
+    def beta_step(self, previous_slice: tf.Tensor, i: tf.Tensor) -> tf.Tensor:
+        """ shape = [batch_size, max_label_length + 1, state] """
+        horizontal_step = \
+            tf.reduce_logsumexp(self.horizontal_step_log_proba[:, i] + tf.expand_dims(previous_slice, 3), 2)
+        # shape = [batch_size, max_label_length + 1, state]
+        diagonal_step = \
+            self.any_to_open_diagonal_step_log_proba[:, i] + tf.roll(previous_slice[:, :, 1:], shift=-1, axis=1)
+        # shape = [batch_size, max_label_length + 1, state]
+        new_beta_slice = logsumexp(
+            x=horizontal_step,  # shape = [batch_size, max_label_length + 1, state]
+            y=diagonal_step,    # shape = [batch_size, max_label_length + 1, state]
+        )
+        # shape = [batch_size, max_label_length + 1, state]
+        return new_beta_slice
+
     @cached_property
     def last_beta_slice(self) -> tf.Tensor:
         """ shape = [batch_size, max_label_length + 1, state] """
-        beta_last = tf.math.log(tf.one_hot(indices=self.label_length, depth=self.max_label_length + 1))
+        beta_last = tf.math.log(tf.one_hot(indices=self.label_length, depth=self.max_label_length_plus_one))
         beta_last = tf.tile(input=tf.expand_dims(beta_last, axis=2), multiples=[1, 1, 2])
         return beta_last
 
@@ -248,35 +336,12 @@ class ClassicCtcLossData(BaseCtcLossData):
         Returns:    tf.Tensor,  shape = [batch_size, max_logit_length + 1, max_label_length + 1, state],
                     dtype = tf.float32
         """
-        horizontal_step_log_proba = self.horizontal_step_log_proba
-        any_to_open_diagonal_step_log_proba = self.any_to_open_diagonal_step_log_proba
-
-        def alpha_step(previous_slice: tf.Tensor, i: tf.Tensor) -> tf.Tensor:
-            horizontal_step = \
-                tf.reduce_logsumexp(horizontal_step_log_proba[:, i] + tf.expand_dims(previous_slice, 2), 3)
-            # shape = [batch_size, max_label_length + 1, state]
-            diagonal_step_log_proba = tf.reduce_logsumexp(any_to_open_diagonal_step_log_proba[:, i] + previous_slice, 2)
-            # shape = [batch_size, max_label_length + 1]
-            # We move by one token because it is a diagonal step
-            moved_diagonal_step_log_proba = tf.roll(diagonal_step_log_proba, shift=1, axis=1)
-            # shape = [batch_size, max_label_length + 1]
-            # Out state is always open:
-            diagonal_step = tf.pad(
-                tensor=tf.expand_dims(moved_diagonal_step_log_proba, 2),
-                paddings=[[0, 0], [0, 0], [1, 0]],
-                constant_values=-np.inf
-            )
-            # shape = [batch_size, max_label_length + 1, state]
-            new_alpha_slice = logsumexp(
-                x=horizontal_step,
-                y=diagonal_step,
-            )
-            # shape = [batch_size, max_label_length + 1, state]
-            return new_alpha_slice
+        # This is to avoid InaccessibleTensorError in graph mode
+        _, _ = self.horizontal_step_log_proba, self.any_to_open_diagonal_step_log_proba
 
         alpha = unfold(
             init_tensor=self.first_alpha_slice,
-            iterfunc=alpha_step,
+            iterfunc=self.alpha_step,
             d_i=1,
             num_iters=self.max_logit_length,
             element_shape=tf.TensorShape([None, None, 2]),
@@ -285,10 +350,43 @@ class ClassicCtcLossData(BaseCtcLossData):
         # shape = [logit_length + 1, batch_size, label_length + 1, state]
         return tf.transpose(alpha, [1, 0, 2, 3])
 
+    def alpha_step(self, previous_slice: tf.Tensor, i: tf.Tensor) -> tf.Tensor:
+        """Args:
+            previous_slice: shape = [batch_size, max_label_length + 1, state]
+            i:
+
+        Returns:            shape = [batch_size, max_label_length + 1, state]
+        """
+        temp = self.horizontal_step_log_proba[:, i] + tf.expand_dims(previous_slice, 2)
+        # shape = [batch_size, max_label_length + 1, next_state, previous_state]
+        horizontal_step = tf.reduce_logsumexp(temp, 3)
+        # shape = [batch_size, max_label_length + 1, state]
+        diagonal_step_log_proba = \
+            tf.reduce_logsumexp(self.any_to_open_diagonal_step_log_proba[:, i] + previous_slice, 2)
+        # shape = [batch_size, max_label_length + 1]
+
+        # We move by one token because it is a diagonal step
+        moved_diagonal_step_log_proba = tf.roll(diagonal_step_log_proba, shift=1, axis=1)
+        # shape = [batch_size, max_label_length + 1]
+
+        # Out state is always open:
+        diagonal_step = tf.pad(
+            tensor=tf.expand_dims(moved_diagonal_step_log_proba, 2),
+            paddings=[[0, 0], [0, 0], [1, 0]],
+            constant_values=-np.inf
+        )
+        # shape = [batch_size, max_label_length + 1, state]
+        new_alpha_slice = logsumexp(
+            x=horizontal_step,
+            y=diagonal_step,
+        )
+        # shape = [batch_size, max_label_length + 1, state]
+        return new_alpha_slice
+
     @cached_property
     def first_alpha_slice(self) -> tf.Tensor:
         """ shape = [batch_size, max_label_length + 1, state] """
-        alpha_0 = tf.math.log(tf.one_hot(indices=0, depth=(self.max_label_length + 1) * 2))
+        alpha_0 = tf.math.log(tf.one_hot(indices=0, depth=self.max_label_length_plus_one * 2))
         alpha_0 = tf.tile(input=tf.reshape(alpha_0, [1, -1, 2]), multiples=[self.batch_size, 1, 1])
         return alpha_0
 
@@ -327,7 +425,7 @@ class ClassicCtcLossData(BaseCtcLossData):
 
         Returns:shape = [batch_size, max_logit_length, max_label_length + 1]
         """
-        return self.expected_token_log_proba
+        return self.expected_token_logproba
 
     @cached_property
     def horizontal_step_log_proba(self) -> tf.Tensor:
@@ -340,14 +438,17 @@ class ClassicCtcLossData(BaseCtcLossData):
         Returns: tf.Tensor, shape = [batch_size, max_logit_length, max_label_length + 1, next_state, previous_state]
         """
         # We map closed and open states to closed states
-        blank_term = \
-            tf.tile(tf.expand_dims(tf.expand_dims(self.blank_log_proba, 2), 3), [1, 1, self.max_label_length + 1, 2])
+        blank_term = tf.tile(
+            input=tf.expand_dims(tf.expand_dims(self.blank_logproba, 2), 3),
+            multiples=[1, 1, self.max_label_length_plus_one, 2]
+        )
         # shape = [batch_size, max_logit_length, max_label_length + 1, 2]
         non_blank_term = tf.pad(
             tf.expand_dims(self.not_blank_horizontal_step_log_proba, 3),
             paddings=[[0, 0], [0, 0], [0, 0], [1, 0]],
             constant_values=tf.constant(-np.inf),
-        )   # shape = [batch_size, max_logit_length, max_label_length + 1, 2]
+        )
+        # shape = [batch_size, max_logit_length, max_label_length + 1, 2]
         horizontal_step_log_proba = tf.stack([blank_term, non_blank_term], axis=3)
         return horizontal_step_log_proba
 
@@ -355,7 +456,7 @@ class ClassicCtcLossData(BaseCtcLossData):
     def not_blank_horizontal_step_log_proba(self) -> tf.Tensor:
         """ shape = [batch_size, max_logit_length, max_label_length + 1] """
         mask = tf.reshape(1 - tf.one_hot(self.blank_token_index, depth=self.num_tokens), shape=[1, 1, -1])
-        not_blank_log_proba = apply_logarithmic_mask(self.log_proba, mask)
+        not_blank_log_proba = apply_logarithmic_mask(self.logproba, mask)
         not_blank_horizontal_step_log_proba = tf.gather(
             params=not_blank_log_proba,
             indices=tf.roll(self.label, shift=1, axis=1),
@@ -372,7 +473,7 @@ class ClassicCtcLossData(BaseCtcLossData):
         Returns:    tf.Tensor,  shape = [batch_size, max_logit_length, max_label_length + 1]
         """
         previous_label_token_log_proba = tf.gather(
-            params=self.log_proba,
+            params=self.logproba,
             indices=self.preceded_label,
             axis=2,
             batch_dims=1,
@@ -381,6 +482,78 @@ class ClassicCtcLossData(BaseCtcLossData):
         return previous_label_token_log_proba
 
     @cached_property
-    def blank_log_proba(self) -> tf.Tensor:
+    def blank_logproba(self) -> tf.Tensor:
         """ shape = [batch_size, max_logit_length] """
-        return self.log_proba[:, :, self.blank_token_index]
+        return self.logproba[:, :, self.blank_token_index]
+
+    def combine_transition_probabilities(self, a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
+        """Transforms logarithmic transition probabilities a and b.
+
+        Args:
+            a:      shape = [batch, DIMS_A, max_logit_length, max_label_length + 1, state]
+            b:      shape = [batch, max_logit_length, max_label_length + 1, state, DIMS_B]
+
+        Returns:    shape = [batch, DIMS_A, max_logit_length, num_tokens, DIMS_B]
+        """
+        assert len(a.shape) >= 4
+        assert len(b.shape) >= 4
+        assert a.shape[-1] == 2
+        assert b.shape[3] == 2
+
+        dims_a = tf.shape(a)[1:-3]
+        dims_b = tf.shape(b)[4:]
+        a = tf.reshape(a, shape=[self.batch_size, -1, self.max_logit_length, self.max_label_length_plus_one, 2, 1])
+        # shape = [batch_size, dims_a, max_logit_length, max_label_length + 1, state, 1]
+        b = tf.reshape(b, shape=[self.batch_size, 1, self.max_logit_length, self.max_label_length_plus_one, 2, -1])
+        # shape = [batch_size, 1, max_logit_length, max_label_length + 1, state, dims_b]
+
+        # Either open or closed state from alpha and only closed state from beta
+        ab_term = tf.reduce_logsumexp(a, 4) + b[:, :, :, :, 0]
+        # shape = [batch_size, dims_a, max_logit_length, max_label_length + 1, dims_b]
+
+        horizontal_blank_grad_term = \
+            expand_many_dims(self.blank_logproba, axes=[1, 3]) + tf.reduce_logsumexp(ab_term, axis=3)
+        # shape = [batch_size, dims_a, max_logit_length, dims_b]
+
+        act = a[:, :, :, :, 1] + expand_many_dims(self.previous_label_token_log_proba, axes=[1, 4]) + b[:, :, :, :, 1]
+        # shape = [batch_size, dim_a, max_logit_length, max_label_length + 1, dim_b]
+
+        horizontal_non_blank_grad_term = self.select_from_act(act, self.preceded_label)
+        # shape = [batch_size, dim_a, max_logit_length, num_tokens, dim_b]
+
+        input_tensor = a + expand_many_dims(self.any_to_open_diagonal_step_log_proba, axes=[1, 5]) + \
+            tf.roll(b[:, :, :, :, 1:], shift=-1, axis=3)
+        # shape = [batch_size, dim_a, max_logit_length, max_label_length + 1, states, dim_b]
+
+        act = tf.reduce_logsumexp(input_tensor=input_tensor, axis=4)
+        # shape = [batch_size, dim_a, max_logit_length, max_label_length + 1, dim_b]
+
+        diagonal_non_blank_grad_term = self.select_from_act(act=act, label=self.label)
+        # shape = [batch_size, dim_a, max_logit_length, num_tokens, dim_b]
+
+        non_blank_grad_term = logsumexp(horizontal_non_blank_grad_term, diagonal_non_blank_grad_term)
+        # shape = [batch_size, dim_a, max_logit_length, num_tokens, dim_b]
+
+        blank_mask = self.blank_token_index == tf.range(self.num_tokens)
+        # shape = [num_tokens]
+
+        output = tf.where(
+            condition=expand_many_dims(blank_mask, axes=[0, 1, 2, 4]),
+            x=tf.expand_dims(horizontal_blank_grad_term, 3),
+            y=non_blank_grad_term,
+        )
+        # shape = [batch, dim_a, max_logit_length, num_tokens, dim_b]
+        output_shape = tf.concat(
+            [
+                tf.expand_dims(self.batch_size, axis=0),
+                dims_a,
+                tf.expand_dims(self.max_logit_length, axis=0),
+                tf.expand_dims(self.num_tokens, axis=0),
+                dims_b
+            ],
+            axis=0
+        )
+        output_reshaped = tf.reshape(output, shape=output_shape)
+        # shape = [batch, DIMS_A, max_logit_length, num_tokens, DIMS_B]
+
+        return output_reshaped

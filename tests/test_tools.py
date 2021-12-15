@@ -1,10 +1,25 @@
+# Copyright 2022 Alexey Tochin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
 import os
 import unittest
 import tensorflow as tf
 import numpy as np
 
-from tf_seq2seq_losses.tools import logsumexp, insert_zeros, unsorted_segment_logsumexp, finite_difference_gradient, \
-    unfold
+from tf_seq2seq_losses.finite_difference import finite_difference_batch_jacobian
+from tf_seq2seq_losses.tools import logsumexp, insert_zeros, unsorted_segment_logsumexp, unfold, expand_many_dims
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -24,9 +39,10 @@ class TestInsert(unittest.TestCase):
     def test_example(self):
         output = insert_zeros(
             tensor=tf.constant(
-               [[1, 2, 3, 4, 5],
-                [10, 20, 30, 40, 50]],
-            dtype=tf.int32),
+                [[1, 2, 3, 4, 5],
+                 [10, 20, 30, 40, 50]],
+                dtype=tf.int32
+            ),
             mask=tf.constant(
                [[False, True, False, False, True],
                 [False, True,  True, True,  False]]
@@ -41,14 +57,8 @@ class TestInsert(unittest.TestCase):
 
     def test_basic(self):
         output = insert_zeros(
-            tensor=tf.constant(
-               [[1, 2, 2, 0, 0],
-                [1, 1, 1, 1, 0]],
-            dtype=tf.int32),
-            mask=tf.constant(
-               [[False, False, True, False, True],
-                [False, True,  True, True,  False]]
-            ),
+            tensor=tf.constant([[1, 2, 2, 0, 0], [1, 1, 1, 1, 0]], dtype=tf.int32),
+            mask=tf.constant([[False, False, True, False, True], [False, True,  True, True,  False]]),
         )
 
         self.assertEqual(
@@ -58,15 +68,25 @@ class TestInsert(unittest.TestCase):
         )
 
 
-class TestFiniteDifferenceDerivative(unittest.TestCase):
+class TestFiniteDifferenceJacobian(unittest.TestCase):
     def test_basic(self):
         def func(x: tf.Tensor) -> tf.Tensor:
             return tf.reduce_sum(x ** 2, axis=[1, 2]) / 2
         x = tf.ones(shape=[2, 3, 4])
 
-        derivative = finite_difference_gradient(func=func, x=x, epsilon=1e-3)
+        derivative = finite_difference_batch_jacobian(func=func, x=x, epsilon=1e-3)
 
         expected_derivative = tf.ones(shape=[2, 3, 4], dtype=tf.float32)
+        self.assertLess(tf.reduce_max(tf.abs(derivative - expected_derivative)), 1e-3)
+
+    def test_shape(self):
+        def func(x: tf.Tensor) -> tf.Tensor:
+            return x ** 2 / 2
+        x = tf.ones(shape=[2, 3, 4])
+
+        derivative = finite_difference_batch_jacobian(func=func, x=x, epsilon=1e-3)
+
+        expected_derivative = tf.reshape(tf.tile(tf.eye(3 * 4, dtype=tf.float32), [2, 1]), shape=[2, 3, 4, 3, 4])
         self.assertLess(tf.reduce_max(tf.abs(derivative - expected_derivative)), 1e-3)
 
 
@@ -89,6 +109,13 @@ class TestUnsortedSegmentLogsumexp(unittest.TestCase):
 
         self.assertAlmostEqual(np.log(2), output.numpy()[0], 8)
         self.assertEqual(-np.inf, output.numpy()[1])
+
+
+class TestExpandManyDims(unittest.TestCase):
+    def test_doc_example(self):
+        output = expand_many_dims(tf.zeros(shape=[5, 1, 3]), axes=[0, 4, 5])
+
+        self.assertEqual([1, 5, 1, 3, 1, 1], list(output.shape))
 
 
 class TestUnfold(unittest.TestCase):

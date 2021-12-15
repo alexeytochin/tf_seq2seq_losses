@@ -22,6 +22,6 @@ from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
 
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 __author__ = 'Alexey Tochin'
 __all__ = ["classic_ctc_loss", "simplified_ctc_loss"]
