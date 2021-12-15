@@ -16,6 +16,8 @@
 import tensorflow as tf
 from typing import Optional, Dict, Union
 
+from tf_seq2seq_losses.tools import logit_to_logproba
+
 
 def tf_ctc_loss(
         labels: tf.Tensor,
@@ -69,10 +71,12 @@ def generate_ctc_loss_inputs(
         dtype=tf.int32
     )
     labels = tf.random.uniform(minval=1, maxval=num_tokens, shape=[batch_size, max_logit_length], dtype=tf.int32)
+    log_probas = logit_to_logproba(logit=logits, axis=2)
 
     return {
         "labels": labels,
         "logits": logits,
+        "logprobas": log_probas,
         "label_length": label_length,
         "logit_length": logit_length,
         "blank_index": blank_index

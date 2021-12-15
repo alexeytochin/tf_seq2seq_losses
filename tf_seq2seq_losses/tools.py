@@ -13,9 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Union, Callable
+from typing import Union, Callable, List, Optional
 import tensorflow as tf
 import numpy as np
+
+
+inf = tf.constant(np.inf)
 
 
 def logit_to_logproba(logit: tf.Tensor, axis: int) -> tf.Tensor:
@@ -44,15 +47,6 @@ def apply_logarithmic_mask(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
     Returns:    tf.Tensor, dtype = tf.float32 of the same shape as tensor
     """
     return tensor + tf.math.log(tf.cast(mask, dtype=tf.float32))
-
-
-def pad_with_minus_inf(tensor: tf.Tensor, desired_size: int, axis: int) -> tf.Tensor:
-    return pad_until(
-        tensor=tensor,
-        desired_size=desired_size,
-        axis=axis,
-        pad_value=tf.constant(-np.inf, dtype=tensor.dtype),
-    )
 
 
 def logsumexp(x: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
@@ -145,8 +139,7 @@ def pad_until(
 
 
 def insert_zeros(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
-    """
-    Insert zeros into tensor before each masked element.
+    """Inserts zeros into tensor before each masked element.
     For example:
     ```python
         output = insert_zeros(
@@ -183,57 +176,6 @@ def insert_zeros(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
     )
 
     return output
-
-
-def finite_difference_gradient(func: Callable[[tf.Tensor], tf.Tensor], x: tf.Tensor, epsilon: float) -> tf.Tensor:
-    """Calculate final difference gradient approximation
-        gradient : x_bij -> gradient(x)_bij = (func(x + epsilon)_bij - func(x)_bij) / epsilon
-    for given function
-        func : x_bij -> y_b = func(x)_b.
-
-    The first (zero) dimension of x is the batch dimension. Namely it is assumed that different components of func(x)_b
-    are independent functions of different components of x_b. For example:
-        func = tf.reduce_sum(x**2, axis = [1,2]), for rank = 3 tensor x,
-    but not
-        incorrect_func = tf.reduce_sum(x**2, axis = [0,1,2]).
-
-    Example of usage:
-    ```python
-        x = tf.ones(shape=[2, 3, 4])
-        epsilon = 1e-3
-        func = lambda x: tf.reduce_sum(x**2, axis=[1,2]) / 2
-        finite_difference_gradient(func=func, x=x, epsilon=epsilon)
-        # -> tf.ones(shape=[2, 3, 4], dtype=tf.float32) # (approximately for epsilon -> 0)
-   ```
-
-    Args:
-        func:       Callable:   tf.Tensor, shape = [batch_size, ...],   dtype = tf.float32
-                            ->  tf.Tensor, shape = [batch_size],        dtype = tf.float32
-        x:          tf.Tensor, shape = [batch_size, ...], rank >= 1,    dtype = tf.float32
-                    that is the input tensor for func
-        epsilon:    float, finite difference parameter.
-
-    Returns:        tf.Tensor, shape = [batch_size, ...] (the same shape as for x.)
-    """
-    input_shape = tf.shape(x)[1:]
-    input_rank = input_shape.shape[0]
-    dim = tf.reduce_prod(input_shape)
-    dx = tf.reshape(
-        tf.eye(dim, dtype=x.dtype),
-        shape=tf.concat([tf.constant([1]), tf.reshape(dim, [1]), input_shape], axis=0)
-    )
-    # shape = [1, dim] + input_shape
-
-    pre_x1 = tf.expand_dims(x, 1) + epsilon * dx
-    # shape = [batch_size, dim] + input_shape
-    x1 = tf.reshape(pre_x1, shape=tf.concat([tf.constant([-1], dtype=tf.int32), input_shape], axis=0))
-    # shape = [batch_size * dim] + input_shape
-    x0 = tf.tile(x, multiples=[dim] + [1] * input_rank)
-    pre_derivative = (func(x1) - func(x0)) / epsilon
-    # shape = [batch_size * dim]
-    derivative = tf.reshape(pre_derivative, shape=tf.concat([tf.constant([-1]), input_shape], axis=0))
-    # shape = [batch_size] + input_shape
-    return derivative
 
 
 def unfold(
@@ -291,13 +233,7 @@ def unfold(
     positive_direction = d_i == 1
 
     with tf.name_scope(name):
-        if isinstance(num_iters, int):
-            num_iters = tf.constant(num_iters, dtype=tf.int32)
-        elif isinstance(num_iters, tf.Tensor):
-            pass
-        else:
-            raise ValueError(f"num_iters argument must be a pythonic integer o a tf.Tensor "
-                             f"but it has type '{type(num_iters)}'.")
+        num_iters = tf.convert_to_tensor(num_iters)
 
         tensor_array = tf.TensorArray(
             dtype=init_tensor.dtype,
@@ -343,3 +279,87 @@ def reduce_max_with_default(input_tensor: tf.Tensor, default: tf.Tensor) -> tf.T
         x=tf.reduce_max(input_tensor),
         y=default
     )
+
+
+def expand_many_dims(input: tf.Tensor, axes: List[int]) -> tf.Tensor:
+    """Analogous of tf.expand_dims for multiple new dimensions.
+    Like for tf.expand_dims no new memory allocated for the output tensor.
+
+    For example:
+        expand_many_dims(tf.zeros(shape=[5, 1, 3]), axes=[0, 4, 5]).shape
+        # -> [1, 5, 1, 3, 1, 1]
+
+    Args:
+        input:  tf.Tensor of any rank shape and type
+        axes:   list of integer that are supposed to be the indexes of new dimensions.
+
+    Returns:    tf.Tensor of the same type an input and rank = rank(input) + len(axes)
+    """
+    tensor = input
+    for axis in axes:
+        tensor = tf.expand_dims(input=tensor, axis=axis)
+
+    return tensor
+
+
+def smart_transpose(a: tf.Tensor, perm=List[int]) -> tf.Tensor:
+    """Extension of tf.transpose.
+    Parameter perm may be shorter list than rank on input tensor a.
+    This case all dimensions that are beyond the list perm remain unchanged.
+
+    For example:
+        smart_transpose(tf.zeros(shape=[2, 3, 4, 5, 6]), [2, 1, 0]).shape
+        # -> [4, 3, 2, 5, 6]
+
+    Args:
+        a:      tf.Tensor of any rank shape and type
+        perm:   list of integers like for tf.transpose but in may be shorter than the shape of a.
+
+    Returns:    tf.Tensor of the same type and rank as th input tensor a.
+    """
+    if len(perm) > len(a.shape):
+        raise ValueError(f"Tensor with shape '{a.shape}' cannot be reshaped to '{perm}'")
+    else:
+        perm_rest = list(range(len(perm), len(a.shape)))
+
+    return tf.transpose(a=a, perm=perm + perm_rest)
+
+
+def smart_reshape(tensor: tf.Tensor, shape: List[Optional[Union[int, tf.Tensor]]]) -> tf.Tensor:
+    """A version of tf.reshape.
+    1. The ouput tensor is always of the same rank as input tensor.
+    2. The parameter shape is supposed to be a list that is smaller or equal
+    than the tensor shape.
+    3. The list shape may contain None, that means "keep this dimension unchanged".
+    4. The list shape is appended with None value to be of the same length as the input tensor shape.
+    5. Like for tf.reshape output tensor does not requre new memory for allocation.
+
+    For example:
+    ```python
+        smart_reshape(
+            tensor=tf.zeros(shape=[2, 3, 4, 5]),
+            shape=[8, None, 1]
+        )
+        # -> tf.Tensor([8, 3, 1, 5])
+    ```
+
+    Args:
+        tensor: tf.Tensor of any shape and type
+        shape:  list of optional static of dynamic integrates
+
+    Returns:    tf.Tensor of the same typey and rank as the input tensor
+    """
+    if len(shape) > len(tensor.shape):
+        raise ValueError(f"Tensor with shape {tensor.shape} cannot be reshaped to {shape}.")
+    else:
+        shape = shape + [None] * (len(tensor.shape) - len(shape))
+
+    original_shape = tf.shape(tensor)
+    new_shape = []
+    for index, dim in enumerate(shape):
+        if dim is None:
+            new_shape.append(original_shape[index])
+        else:
+            new_shape.append(dim)
+
+    return tf.reshape(tensor=tensor, shape=new_shape)

@@ -20,7 +20,7 @@ here = pathlib.Path(__file__).parent.resolve()
 
 setup(
     name='tf-seq2seq-losses',
-    version="0.1.3",
+    version="0.2.0",
     description='Tensorflow implementations for seq2seq Machine Learning model loss functions',
     long_description=(here / 'README.md').read_text(encoding='utf-8'),
     long_description_content_type='text/markdown',
@@ -41,5 +41,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-    keywords='tensorflow, loss, ctc, connectionist temporal classification',
+    keywords='tensorflow, loss, loss function, ctc, connectionist temporal classification, '
+             'seq2se, seq 2 seq, seq to seq, asr, automatic speach recognition, sequence recognition'
+             'hessian, second derivative'
 )
