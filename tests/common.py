@@ -48,6 +48,7 @@ def generate_ctc_loss_inputs(
         max_logit_length:   maximal logit length
         random_seed:        random seed
         num_tokens:         number of tokens
+        blank_index:        blank index
 
     Returns:                dictionary with random tensors.
     """

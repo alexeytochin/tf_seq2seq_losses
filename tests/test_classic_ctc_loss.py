@@ -85,11 +85,11 @@ class TestClassicCtcLoss(TestCtcLoss):
         blank_index = tf.constant(0, dtype=tf.int32)
 
         loss_data = ClassicCtcLossData(
-            logits = logit,
-            labels = label,
-            logit_length = length_logit,
-            label_length = length_label,
-            blank_index = blank_index,
+            logits=logit,
+            labels=label,
+            logit_length=length_logit,
+            label_length=length_label,
+            blank_index=blank_index,
         )
 
         self.assertLess(loss_data.log_loss.numpy()[0], 1e-6)
@@ -104,9 +104,9 @@ class TestClassicCtcLoss(TestCtcLoss):
 
         # We verify that the values of the sums a equal to the loss up to a sign.
         self.assertTensorsAlmostEqual(
-            first = -tf.expand_dims(loss_data.log_loss, 1),
-            second = sums,
-            places = 6,
+            first=-tf.expand_dims(loss_data.log_loss, 1),
+            second=sums,
+            places=6,
         )
 
     def test_length_two_case(self):
@@ -119,24 +119,24 @@ class TestClassicCtcLoss(TestCtcLoss):
         logit_length = tf.constant([2, 2], dtype=tf.int32)
 
         loss_data = ClassicCtcLossData(
-            logits = logits,
-            labels = labels,
-            logit_length = logit_length,
-            label_length = label_length,
-            blank_index = blank_index,
+            logits=logits,
+            labels=labels,
+            logit_length=logit_length,
+            label_length=label_length,
+            blank_index=blank_index,
         )
 
         self.assertAlmostEqual(-np.log(1/3 * 1/3), loss_data.log_loss.numpy()[0], 6)
         self.assertAlmostEqual(-np.log(3 * 1/3 * 1/3), loss_data.log_loss.numpy()[1], 6)
         self.assertTensorsAlmostEqual(
-            first = tf.constant([[[0., 1., 0.], [0., 0., 1.]],  [[1/3, 2/3, 0.], [1/3, 2/3, 0.]]]),
-            second = tf.exp(loss_data.logarithmic_log_proba_gradient),
-            places = 6
+            first=tf.constant([[[0., 1., 0.], [0., 0., 1.]],  [[1/3, 2/3, 0.], [1/3, 2/3, 0.]]]),
+            second=tf.exp(loss_data.logarithmic_log_proba_gradient),
+            places=6
         )
         self.assertTensorsAlmostEqual(
-            first = tf.constant([[[1/3, -2/3, 1/3], [1/3, 1/3, -2/3]], [[0., -1/3, 1/3], [0., -1/3, 1/3]]]),
-            second = loss_data.gradient,
-            places = 6
+            first=tf.constant([[[1/3, -2/3, 1/3], [1/3, 1/3, -2/3]], [[0., -1/3, 1/3], [0., -1/3, 1/3]]]),
+            second=loss_data.gradient,
+            places=6
         )
 
     def test_repeated_token_case(self):
@@ -148,11 +148,11 @@ class TestClassicCtcLoss(TestCtcLoss):
         logit_length = tf.constant([3], dtype=tf.int32)
 
         loss_session = ClassicCtcLossData(
-            logits = logits,
-            labels = labels,
-            logit_length = logit_length,
-            label_length = label_length,
-            blank_index = blank_index,
+            logits=logits,
+            labels=labels,
+            logit_length=logit_length,
+            label_length=label_length,
+            blank_index=blank_index,
         )
 
         # Label "aa" corresponds to a single paths: "a_a" with probability 3 ** -3
@@ -167,11 +167,11 @@ class TestClassicCtcLoss(TestCtcLoss):
         logit_length = tf.constant([3], dtype=tf.int32)
 
         loss_session = ClassicCtcLossData(
-            logits = logits,
-            labels = labels,
-            logit_length = logit_length,
-            label_length = label_length,
-            blank_index = blank_index,
+            logits=logits,
+            labels=labels,
+            logit_length=logit_length,
+            label_length=label_length,
+            blank_index=blank_index,
         )
 
         # Label "a" corresponds to 6 paths: "a__", "_a_", "__a", "aa_", "_aa", and "aaa" with equal probability 3 ** -3
@@ -223,12 +223,12 @@ class TestClassicCtcLoss(TestCtcLoss):
         input_dict = \
             generate_ctc_loss_inputs(max_logit_length=20, batch_size=8, random_seed=0, num_tokens=8, blank_index=0)
         tf_ctc_loss = tf.nn.ctc_loss(
-            labels = input_dict["labels"],
-            logits = input_dict["logits"],
-            label_length = input_dict["label_length"],
-            logit_length = input_dict["logit_length"],
-            logits_time_major = False,
-            blank_index = 0,
+            labels=input_dict["labels"],
+            logits=input_dict["logits"],
+            label_length=input_dict["label_length"],
+            logit_length=input_dict["logit_length"],
+            logits_time_major=False,
+            blank_index=0,
         )
         loss_session = ClassicCtcLossData(**input_dict)
 
@@ -243,19 +243,19 @@ class TestClassicCtcLoss(TestCtcLoss):
         with tf.GradientTape(persistent=True) as tape:
             tape.watch([input_dict["logits"]])
             tf_loss = tf.nn.ctc_loss(
-                labels = input_dict["labels"],
-                logits = input_dict["logits"],
-                label_length = input_dict["label_length"],
-                logit_length = input_dict["logit_length"],
-                logits_time_major = False,
-                blank_index = 0,
+                labels=input_dict["labels"],
+                logits=input_dict["logits"],
+                label_length=input_dict["label_length"],
+                logit_length=input_dict["logit_length"],
+                logits_time_major=False,
+                blank_index=0,
             )
             testing_loss = classic_ctc_loss(
-                labels = input_dict["labels"],
-                logits = input_dict["logits"],
-                label_length = input_dict["label_length"],
-                logit_length = input_dict["logit_length"],
-                blank_index = 0,
+                labels=input_dict["labels"],
+                logits=input_dict["logits"],
+                label_length=input_dict["label_length"],
+                logit_length=input_dict["logit_length"],
+                blank_index=0,
             )
         tf_version_gradient = tape.gradient(tf_loss, input_dict["logits"])
         classic_version_gradient = tape.gradient(testing_loss, input_dict["logits"])
@@ -266,16 +266,18 @@ class TestClassicCtcLoss(TestCtcLoss):
         input_dict = \
             generate_ctc_loss_inputs(max_logit_length=16, batch_size=1, random_seed=0, num_tokens=4, blank_index=0)
         logits = input_dict["logits"]
+
         def loss_fn(logit):
             return tf.reduce_sum(classic_ctc_loss(
-                labels = input_dict["labels"],
-                logits = tf.expand_dims(logit, 0),
-                label_length = input_dict["label_length"],
-                logit_length = input_dict["logit_length"],
-                blank_index = 0,
+                labels=input_dict["labels"],
+                logits=tf.expand_dims(logit, 0),
+                label_length=input_dict["label_length"],
+                logit_length=input_dict["logit_length"],
+                blank_index=0,
             ))
+
         gradient_numerical = finite_difference_gradient(
-            func=lambda logits: tf.vectorized_map(fn=loss_fn, elems=logits),
+            func=lambda logits_: tf.vectorized_map(fn=loss_fn, elems=logits_),
             x=logits,
             epsilon=1e-3
         )
@@ -291,6 +293,7 @@ class TestClassicCtcLoss(TestCtcLoss):
         batch_size = 1
         num_token = 3
         logit_length = 5
+
         loss = classic_ctc_loss(
             labels=tf.constant([[1, 2, 2, 1]], dtype=tf.int32),
             logits=tf.zeros(shape=[batch_size, logit_length, num_token], dtype=tf.float32),

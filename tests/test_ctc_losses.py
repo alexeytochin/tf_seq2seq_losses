@@ -12,16 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 import unittest
-import logging
 from typing import Optional
 import numpy as np
 import tensorflow as tf
 import os
-
-# from tests.common import generate_ctc_loss_inputs
-# from tf_seq2seq_losses.ctc_loss import SimplifiedCtcLossData, simplified_ctc_loss, ClassicCtcLossData, classic_ctc_loss
-# from tf_seq2seq_losses.tools import finite_difference_gradient
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""

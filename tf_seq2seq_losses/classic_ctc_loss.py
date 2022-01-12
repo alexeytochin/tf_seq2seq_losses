@@ -27,7 +27,7 @@ def classic_ctc_loss(
         logits: tf.Tensor,
         label_length: tf.Tensor,
         logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor] = 0,
+        blank_index: Union[int, tf.Tensor]=0,
 ) -> tf.Tensor:
     """Computes CTC (Connectionist Temporal Classification) loss from
     http://www.cs.toronto.edu/~graves/icml_2006.pdf.
@@ -67,7 +67,7 @@ class ClassicCtcLossData(BaseCtcLossData):
     http://www.cs.toronto.edu/~graves/icml_2006.pdf.
 
     This loss is actually the logarithmic likelihood for the classification task with multiple expected class.
-    All predicated sequences consist of tokens (denoted like "a", "b", ... below) and the blank ("_").
+    All predicated sequences consist of tokens (denoted like "a", "b", ... below) and the blank "_".
     The classic CTC decoding merges all repeated non-blank labels and removes the blank.
     For example, predicted sequence
         a_bb_ccc_c is decoded as "abcc".
@@ -89,20 +89,21 @@ class ClassicCtcLossData(BaseCtcLossData):
     For each token sequence we define two sequences called "closed" and "open".
     For example, for label "abc" we consider its two states denoted "abc>" (closed) and "abc<" (open).
     The difference between them is in their behaviour with respect to the token appending. The rules are:
-        "...a>" + "_" -> "..a>",
-        "...a<" + "_" -> "..a>",
-        "...a>" + "a" -> "..aa<",
-        "...a<" + "a" -> "..a<",
-        "...a>" + "b" -> "..ab<",
-        "...a<" + "b" -> "..ab<".
-    Namely, appending a token the is equal to the last one to a an open state does not change this state.
+        "...a>" + "_" -> "...a>",
+        "...a<" + "_" -> "...a>",
+        "...a>" + "a" -> "...aa<",
+        "...a<" + "a" -> "...a<",
+        "...a>" + "b" -> "...ab<",
+        "...a<" + "b" -> "...ab<",
+    for any different tokens "a" and "b" and any token sequence denoted by "...".
+    Namely, appending a token the is equal to the last one to an open state does not change this state.
     Appending a blank to a state always males this state closed.
 
     This is why alpha_{b,t,l,s} and beta_{b,t,l,s} in the code below are equipped with an additional index s=0,1.
     Closed states corresponds s=0 and open ones to s=1.
 
     In particular, the flowing identity is satisfied
-        sum_s sum_l exp alpha_{b,t,l,s} * exp beta_{b,t,l,s} = loss_b, for any b and t
+        sum_s sum_l exp alpha_{b,t,l,s} * exp beta_{b,t,l,s} = loss_{b}, for any b and t
     """
     @cached_property
     def non_blank_grad_term(self) -> tf.Tensor:
@@ -110,9 +111,8 @@ class ClassicCtcLossData(BaseCtcLossData):
         for non-blank tokens.
 
         There are to terms to sum up:
-        1. Horizontal steps from repeated token: open alpha state to open beta state
-        2. Diagonal steps from either open or closed state to an open state
-
+            1. Horizontal steps from repeated token: open alpha state to open beta state
+            2. Diagonal steps from either open or closed state to an open state
 
         Returns: tf.Tensor, shape = [batch_size, max_logit_length, num_tokens]
         The values at [:, :, self._token_index] are to be ignored

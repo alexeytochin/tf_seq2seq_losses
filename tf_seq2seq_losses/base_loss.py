@@ -232,19 +232,19 @@ class BaseCtcLossData(ABC):
         return cleaned_label
 
     def select_from_act(self, act: tf.Tensor, label: tf.Tensor) -> tf.Tensor:
-        """Takes tensor of acts act_{b,t,u} and labels label_{b,u},
+        """Takes tensor of acts act_{b,t,u,...} and labels label_{b,u},
         where b is the batch index, t is the logit index, and u is the label index,
         and returns for each token index k the tensor
 
-            output_{b, t, k} = logsumexp_u act_{b, t, u_k} * delta(u_k = label_{b,u})
+            output_{b,t,k} = logsumexp_u act_{b,t,u_k,...} * delta(u_k = label_{b,u})
 
-        that is logarithmic sum of exponents of acts for all u_k = label_{b,u}, given b, t, k.
+        that is logarithmic sum of exponents of acts for all u_k = label_{b,u}, given b, t and k.
 
         Args:
-            act:    tf.Tensor, shape = [batch_size, max_logit_length, max_label_length + 1]
-            label:  tf.Tensor, shape = [batch_size, max_label_length + 1]
+            act:    tf.Tensor, shape = [batch_size, max_logit_length, max_label_length + 1, ...]
+            label:  tf.Tensor, shape = [batch_size, max_label_length + 1, ...]
 
-        Returns:    tf.Tensor, shape = [batch_size, max_label_length + 1, num_tokens]
+        Returns:    tf.Tensor, shape = [batch_size, max_label_length + 1, num_tokens, ...]
         """
         data = tf.transpose(act, [0, 2, 1])
         data = tf.reshape(data, shape=[self.batch_size * (self.max_label_length + 1), self.max_logit_length])

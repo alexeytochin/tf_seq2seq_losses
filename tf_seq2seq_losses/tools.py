@@ -274,7 +274,7 @@ def unfold(
 
     Args:
         init_tensor:    tf.Tensor, of any shape that is the initial value of the iterations.
-        iterfunc:       tf.Tensor, int -> tf.Tensor, that is the iteration function
+        iterfunc:       tf.Tensor, tf.Tensor -> tf.Tensor, that is the iteration function
                             from and onto the same shape as init_tensor
         num_iters:      tf.Tensor or static integer that is the number of iterations
         d_i:            either +1 or -1, where
