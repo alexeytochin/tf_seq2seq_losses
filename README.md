@@ -116,7 +116,7 @@ The bottleneck is the iterations over the logit length in order to calculate
 [paper](file:///home/alexey/Downloads/Connectionist_temporal_classification_Labelling_un.pdf)
 ). Expected gradient GPU calculation time is linear over logit length. 
 
-## Known Probelems
+## Known Problems
 1. Warning:
 > AutoGraph could not transform <function classic_ctc_loss at ...> and will run it as-is.
 Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output.
