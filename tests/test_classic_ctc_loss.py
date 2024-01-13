@@ -20,8 +20,8 @@ from tests.common import generate_ctc_loss_inputs
 from tests.test_ctc_losses import TestCtcLoss
 from tf_seq2seq_losses.base_loss import ctc_loss_from_logproba
 from tf_seq2seq_losses.classic_ctc_loss import ClassicCtcLossData, classic_ctc_loss
-from tf_seq2seq_losses.finite_difference import finite_difference_batch_jacobian
-from tf_seq2seq_losses.tools import logit_to_logproba, inf
+from tests.finite_difference import finite_difference_batch_jacobian
+from tf_seq2seq_losses.tools import logit_to_logproba
 
 
 class TestClassicCtcLoss(TestCtcLoss):

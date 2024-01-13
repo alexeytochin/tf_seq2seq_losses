@@ -18,7 +18,7 @@ import tensorflow as tf
 
 from tests.common import generate_ctc_loss_inputs
 from tests.test_ctc_losses import TestCtcLoss
-from tf_seq2seq_losses.finite_difference import finite_difference_batch_jacobian
+from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss, SimplifiedCtcLossData
 from tf_seq2seq_losses.tools import logit_to_logproba
 

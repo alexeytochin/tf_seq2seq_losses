@@ -18,7 +18,7 @@ import unittest
 import tensorflow as tf
 import numpy as np
 
-from tf_seq2seq_losses.finite_difference import finite_difference_batch_jacobian
+from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.tools import logsumexp, insert_zeros, unsorted_segment_logsumexp, unfold, expand_many_dims
 
 
