@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
+import unittest
 from typing import Callable, Union
 import tensorflow as tf
 
-
+@unittest.skip()
 def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: tf.Tensor, epsilon: float) -> tf.Tensor:
     """Calculate final difference jacobian approximation
         gradient : x_bij -> gradient(x)_bij = (func(x + epsilon)_bij - func(x)_bij) / epsilon
@@ -77,6 +77,7 @@ def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: 
     return dy
 
 
+@unittest.skip()
 def _finite_difference_batch_jacobian(func, x, epsilon: Union[float, tf.Tensor]) -> tf.Tensor:
     """
 

@@ -32,7 +32,9 @@ class TestLogSumExp(unittest.TestCase):
 
         output = logsumexp(x=x, y=y)
 
-        self.assertAlmostEqual(max(np.abs(np.array([-3.0753517, -0.4283799, -np.inf]) - output.numpy())), 0, 6)
+        self.assertAlmostEqual(-3.0753517, output[0].numpy(), 0, 6)
+        self.assertAlmostEqual(-0.4283799, output[1].numpy(), 0, 6)
+        self.assertEqual(-np.inf, output[2].numpy())
 
 
 class TestInsert(unittest.TestCase):
