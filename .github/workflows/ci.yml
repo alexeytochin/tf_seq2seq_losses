@@ -22,15 +22,15 @@ jobs:
 #      - name: List files in the repository
 #        run: |
 #          ls ${{ github.workspace }}
-      - name: PWD
-        run: |
-          pwd
-#      - name: CD ..
+#      - name: PWD
+#        run: |
+#          pwd
+##      - name: CD ..
 #        run: |
 #          cd ..
-      - name: LS
-        run: |
-          ls
+#      - name: LS
+#        run: |
+#          ls
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
