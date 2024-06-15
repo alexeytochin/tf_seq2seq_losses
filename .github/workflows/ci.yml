@@ -37,5 +37,5 @@ jobs:
           pip install -r requirements.txt
       - name: Test with unittest
         run: |
-          unittest
+          python -m unittest
       - run: echo "🍏 This job's status is ${{ job.status }}."
