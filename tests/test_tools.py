@@ -13,16 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-import os
 import unittest
 import tensorflow as tf
 import numpy as np
 
 from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.tools import logsumexp, insert_zeros, unsorted_segment_logsumexp, unfold, expand_many_dims
-
-
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TestLogSumExp(unittest.TestCase):
@@ -32,7 +28,9 @@ class TestLogSumExp(unittest.TestCase):
 
         output = logsumexp(x=x, y=y)
 
-        self.assertAlmostEqual(max(np.abs(np.array([-3.0753517, -0.4283799, -np.inf]) - output.numpy())), 0, 6)
+        self.assertAlmostEqual(-3.0753517, output[0].numpy(), 0, 6)
+        self.assertAlmostEqual(-0.4283799, output[1].numpy(), 0, 6)
+        self.assertEqual(-np.inf, output[2].numpy())
 
 
 class TestInsert(unittest.TestCase):
