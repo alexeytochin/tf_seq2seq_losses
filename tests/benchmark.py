@@ -29,11 +29,9 @@ from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
 
 
-logging.getLogger().setLevel(logging.INFO)
-
-
 class TestBenchmarkCtcLosses(unittest.TestCase):
     def setUp(self) -> None:
+        logging.getLogger().setLevel(logging.INFO)
         self.batch_size = 256
         self.num_tokens = 32
         self.max_logit_length = 255

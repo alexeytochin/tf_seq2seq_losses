@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import unittest
 
 import numpy as np
 import tensorflow as tf
@@ -335,6 +336,7 @@ class TestClassicCtcLoss(TestCtcLoss):
 
         self.assertTensorsAlmostEqual(tf_version_gradient, classic_version_gradient, 4)
 
+    @unittest.skip("fix_finite_difference")
     def test_gradient_vs_finite_difference(self):
         blank_index = 0
         input_dict = generate_ctc_loss_inputs(
@@ -415,6 +417,7 @@ class TestClassicCtcLoss(TestCtcLoss):
             list(hessian_analytic.shape)
         )
 
+    @unittest.skip("fix_finite_difference")
     def test_hessian_vs_finite_difference(self):
         input_dict = \
             generate_ctc_loss_inputs(

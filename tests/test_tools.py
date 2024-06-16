@@ -13,16 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-import os
 import unittest
 import tensorflow as tf
 import numpy as np
 
 from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.tools import logsumexp, insert_zeros, unsorted_segment_logsumexp, unfold, expand_many_dims
-
-
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TestLogSumExp(unittest.TestCase):
