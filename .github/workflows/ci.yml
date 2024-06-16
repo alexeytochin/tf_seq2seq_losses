@@ -21,8 +21,9 @@ jobs:
           pip install -r requirements.txt
           pip install pylint
       - name: Analysing the code with pylint
-        run: |
-          find . -type f -name "*.py" | xargs pylint
+        run: find . -type f -name "*.py" | xargs pylint
+      - name: Analysing the code with ruff
+        run: ruff check .
       - name: Test with unittest
         run: |
           python -m unittest
@@ -40,8 +41,9 @@ jobs:
           pip install -r requirements.txt
           pip install pylint
       - name: Analysing the code with pylint
-        run: |
-          find . -type f -name "*.py" | xargs pylint
+        run: find . -type f -name "*.py" | xargs pylint
+      - name: Analysing the code with ruff
+        run: ruff check .
       - name: Test with unittest
         run: |
           python -m unittest
