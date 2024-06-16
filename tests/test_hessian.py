@@ -20,13 +20,16 @@ from tests.test_ctc_losses import TestCtcLoss
 from tf_seq2seq_losses import classic_ctc_loss
 from tf_seq2seq_losses.base_loss import ctc_loss_from_logproba
 from tests.finite_difference import finite_difference_batch_jacobian
-from tf_seq2seq_losses.simplified_ctc_loss import SimplifiedCtcLossData, simplified_ctc_loss
+from tf_seq2seq_losses.simplified_ctc_loss import (
+    SimplifiedCtcLossData,
+    simplified_ctc_loss,
+)
 from tf_seq2seq_losses.tools import logit_to_logproba
 
 
 class TestSimplifiedCtcLoss(TestCtcLoss):
     def test_single_logit_case(self):
-        logits = tf.math.log(tf.constant([[[1/3, 1/3, 1/3]]], dtype=tf.float32))
+        logits = tf.math.log(tf.constant([[[1 / 3, 1 / 3, 1 / 3]]], dtype=tf.float32))
         labels = tf.constant([[1]], dtype=tf.int32)
         length_label = tf.constant([1], dtype=tf.int32)
         length_logit = tf.constant([1], dtype=tf.int32)
@@ -42,15 +45,20 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         )
 
         self.assertTensorsAlmostEqual(
-            first=tf.constant([[[0., -1., 0.]]]),
-            second=loss_data.gradient,
-            places=6
+            first=tf.constant([[[0.0, -1.0, 0.0]]]), second=loss_data.gradient, places=6
         )
 
-        self.assertTensorsAlmostEqual(tf.zeros(shape=[1, 1, 3, 1, 3]),  loss_data.hessian, places=6)
+        self.assertTensorsAlmostEqual(
+            tf.zeros(shape=[1, 1, 3, 1, 3]), loss_data.hessian, places=6
+        )
 
     def test_simple_case(self):
-        logit = tf.math.log(tf.constant([[[0, 1, 0], [1, 0, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0]]], dtype=tf.float32))
+        logit = tf.math.log(
+            tf.constant(
+                [[[0, 1, 0], [1, 0, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0]]],
+                dtype=tf.float32,
+            )
+        )
         label = tf.constant([[1, 2, 1]], dtype=tf.int32)
         length_label = tf.constant([3], dtype=tf.int32)
         length_logit = tf.constant([5], dtype=tf.int32)
@@ -66,11 +74,14 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
             blank_index=blank_index,
         )
 
-        self.assertTensorsAlmostEqual(tf.exp(loss_session.alpha), tf.exp(loss_session.gamma[:, 0, 0]), places=None)
+        self.assertTensorsAlmostEqual(
+            tf.exp(loss_session.alpha), tf.exp(loss_session.gamma[:, 0, 0]), places=None
+        )
 
     def test_gamma_symmetry(self):
-        input_dict = \
-            generate_ctc_loss_inputs(max_logit_length=4, batch_size=1, random_seed=0, num_tokens=3, blank_index=0)
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=4, batch_size=1, random_seed=0, num_tokens=3, blank_index=0
+        )
 
         loss_session = SimplifiedCtcLossData(
             labels=input_dict["labels"],
@@ -81,21 +92,24 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         )
         transposed_hessian = tf.transpose(loss_session.hessian, perm=[0, 3, 4, 1, 2])
 
-        self.assertTensorsAlmostEqual(first=tf.exp(transposed_hessian), second=tf.exp(loss_session.hessian), places=6)
+        self.assertTensorsAlmostEqual(
+            first=tf.exp(transposed_hessian),
+            second=tf.exp(loss_session.hessian),
+            places=6,
+        )
 
     def test_second_derivative_shape(self):
         batch_size = 2
         num_tokens = 3
         max_logit_length = 4
         blank_index = 0
-        input_dict = \
-            generate_ctc_loss_inputs(
-                max_logit_length=max_logit_length,
-                batch_size=batch_size,
-                random_seed=0,
-                num_tokens=num_tokens,
-                blank_index=blank_index
-            )
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=max_logit_length,
+            batch_size=batch_size,
+            random_seed=0,
+            num_tokens=num_tokens,
+            blank_index=blank_index,
+        )
         logprobas = input_dict["logprobas"]
 
         def func(logprobas):
@@ -119,38 +133,33 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
 
         self.assertEqual(
             [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens],
-            list(hessian_analytic.shape)
+            list(hessian_analytic.shape),
         )
 
     def test_hessian_vs_finite_difference(self):
-        input_dict = \
-            generate_ctc_loss_inputs(
-                max_logit_length=4,
-                batch_size=2,
-                random_seed=0,
-                num_tokens=2,
-                blank_index=0
-            )
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=4, batch_size=2, random_seed=0, num_tokens=2, blank_index=0
+        )
         logits = input_dict["logits"]
 
         def gradient_fn(logits):
             with tf.GradientTape() as tape:
                 tape.watch([logits])
-                loss = tf.reduce_sum(simplified_ctc_loss(
-                    labels=input_dict["labels"],
-                    logits=logits,
-                    label_length=input_dict["label_length"],
-                    logit_length=input_dict["logit_length"],
-                    blank_index=0,
-                ))
+                loss = tf.reduce_sum(
+                    simplified_ctc_loss(
+                        labels=input_dict["labels"],
+                        logits=logits,
+                        label_length=input_dict["label_length"],
+                        logit_length=input_dict["logit_length"],
+                        blank_index=0,
+                    )
+                )
             gradient = tape.gradient(loss, sources=logits)
             # shape = [batch_size, logit_length, num_tokens]
             return gradient
 
         hessain_numerical = finite_difference_batch_jacobian(
-            func=gradient_fn,
-            x=logits,
-            epsilon=1e-4
+            func=gradient_fn, x=logits, epsilon=1e-4
         )
         # shape = [batch_size, logit_length, num_tokens, logit_length, num_tokens]
 
@@ -171,19 +180,25 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         logits = tf.zeros(shape=[batch_size, logit_length, num_token], dtype=tf.float32)
         logit_length = tf.constant([logit_length, logit_length - 1], dtype=tf.int32)
 
-        with tf.GradientTape(persistent=True) as tape1: # persistent=True is for experimental_use_pfor=False below
+        with tf.GradientTape(
+            persistent=True
+        ) as tape1:  # persistent=True is for experimental_use_pfor=False below
             tape1.watch([logits])
             with tf.GradientTape() as tape2:
                 tape2.watch([logits])
-                loss = tf.reduce_sum(classic_ctc_loss(
-                    labels=labels,
-                    logits=logits,
-                    label_length=label_length,
-                    logit_length=logit_length,
-                    blank_index=0,
-                ))
+                loss = tf.reduce_sum(
+                    classic_ctc_loss(
+                        labels=labels,
+                        logits=logits,
+                        label_length=label_length,
+                        logit_length=logit_length,
+                        blank_index=0,
+                    )
+                )
             gradient = tape2.gradient(loss, sources=logits)
-        hessian = tape1.batch_jacobian(gradient, source=logits, experimental_use_pfor=False)
+        hessian = tape1.batch_jacobian(
+            gradient, source=logits, experimental_use_pfor=False
+        )
         # experimental_use_pfor=False is needed to avoid a bag in tf.batch_jacobian and tf.jacobian
         # occurred in TensorFlow Version 2.4.1
 
@@ -192,14 +207,13 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         num_tokens = 3
         max_logit_length = 4
         blank_index = 0
-        input_dict = \
-            generate_ctc_loss_inputs(
-                max_logit_length=max_logit_length,
-                batch_size=batch_size,
-                random_seed=0,
-                num_tokens=num_tokens,
-                blank_index=blank_index
-            )
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=max_logit_length,
+            batch_size=batch_size,
+            random_seed=0,
+            num_tokens=num_tokens,
+            blank_index=blank_index,
+        )
         logits = input_dict["logits"]
 
         @tf.function
@@ -208,15 +222,19 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
                 tape1.watch([logits])
                 with tf.GradientTape() as tape2:
                     tape2.watch([logits])
-                    loss = tf.reduce_sum(classic_ctc_loss(
-                        labels=input_dict["labels"],
-                        logits=logits,
-                        label_length=input_dict["label_length"],
-                        logit_length=input_dict["logit_length"],
-                        blank_index=blank_index,
-                    ))
+                    loss = tf.reduce_sum(
+                        classic_ctc_loss(
+                            labels=input_dict["labels"],
+                            logits=logits,
+                            label_length=input_dict["label_length"],
+                            logit_length=input_dict["logit_length"],
+                            blank_index=blank_index,
+                        )
+                    )
                 gradient = tape2.gradient(loss, sources=logits)
-            hessian = tape1.batch_jacobian(gradient, source=logits, experimental_use_pfor=False)
+            hessian = tape1.batch_jacobian(
+                gradient, source=logits, experimental_use_pfor=False
+            )
 
             return hessian
 
@@ -224,5 +242,5 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
 
         self.assertEqual(
             [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens],
-            list(hessian.shape)
+            list(hessian.shape),
         )

@@ -19,31 +19,31 @@ import pathlib
 here = pathlib.Path(__file__).parent.resolve()
 
 setup(
-    name='tf-seq2seq-losses',
+    name="tf-seq2seq-losses",
     version="0.3.0",
-    description='Tensorflow implementations for seq2seq Machine Learning model loss functions',
-    long_description=(here / 'README.md').read_text(encoding='utf-8'),
-    long_description_content_type='text/markdown',
-    url='https://github.com/alexeytochin/tf-seq2seq-losses',
-    author='Alexey Tochin',
-    author_email='alexey.tochin@gmail.com',
-    license='Apache 2.0',
-    license_files=('LICENSE',),
-    packages=['tf_seq2seq_losses'],
+    description="Tensorflow implementations for seq2seq Machine Learning model loss functions",
+    long_description=(here / "README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
+    url="https://github.com/alexeytochin/tf-seq2seq-losses",
+    author="Alexey Tochin",
+    author_email="alexey.tochin@gmail.com",
+    license="Apache 2.0",
+    license_files=("LICENSE",),
+    packages=["tf_seq2seq_losses"],
     install_requires=["tensorflow>=2.6.1", "numpy", "cached_property"],
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Science/Research',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
     ],
-    keywords='tensorflow, loss, loss function, ctc, connectionist temporal classification, '
-             'seq2se, seq 2 seq, seq to seq, asr, automatic speach recognition, sequence recognition'
-             'hessian, second derivative'
+    keywords="tensorflow, loss, loss function, ctc, connectionist temporal classification, "
+    "seq2se, seq 2 seq, seq to seq, asr, automatic speach recognition, sequence recognition"
+    "hessian, second derivative",
 )

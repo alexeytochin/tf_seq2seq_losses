@@ -24,14 +24,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TestCtcLoss(unittest.TestCase):
-    def assertTensorsAlmostEqual(self, first: tf.Tensor, second: tf.Tensor, places: Optional[int]):
+    def assertTensorsAlmostEqual(
+        self, first: tf.Tensor, second: tf.Tensor, places: Optional[int]
+    ):
         if places is None:
             self.assertTrue(tf.reduce_all(first == second).numpy())
         else:
             self.assertAlmostEqual(
                 first=0,
                 second=tf.norm(first - second, ord=np.inf).numpy(),
-                places=places
+                places=places,
             )
-
-

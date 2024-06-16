@@ -1,3 +1,5 @@
+"""Simplified version of CTC (Connectionist Temporal Classification) loss."""
+
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,19 +16,24 @@
 # ==============================================================================
 
 from typing import Union
-import tensorflow as tf
-from cached_property import cached_property
+from functools import cached_property
 
+import tensorflow as tf
 from tf_seq2seq_losses.base_loss import BaseCtcLossData, ctc_loss
-from tf_seq2seq_losses.tools import unfold, logsumexp, expand_many_dims, apply_logarithmic_mask
+from tf_seq2seq_losses.tools import (
+    unfold,
+    logsumexp,
+    expand_many_dims,
+    apply_logarithmic_mask,
+)
 
 
 def simplified_ctc_loss(
-        labels: tf.Tensor,
-        logits: tf.Tensor,
-        label_length: tf.Tensor,
-        logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor] = 0,
+    labels: tf.Tensor,
+    logits: tf.Tensor,
+    label_length: tf.Tensor,
+    logit_length: tf.Tensor,
+    blank_index: Union[int, tf.Tensor] = 0,
 ) -> tf.Tensor:
     """Computes a simpified version of CTC (Connectionist Temporal Classification) loss from
     http://www.cs.toronto.edu/~graves/icml_2006.pdf
@@ -55,26 +62,28 @@ def simplified_ctc_loss(
         label_length=label_length,
         logit_length=logit_length,
         blank_index=blank_index,
-        ctc_loss_data_cls=SimplifiedCtcLossData
+        ctc_loss_data_cls=SimplifiedCtcLossData,
     )
 
 
 class SimplifiedCtcLossData(BaseCtcLossData):
+    """Data class for simplified CTC loss."""
+
     @cached_property
     def loss(self) -> tf.Tensor:
-        """ shape = [batch_size] """
+        """shape = [batch_size]"""
         params = self.alpha[:, -1]
         # shape = [batch_size, max_label_length + 1]
         loss = -tf.gather(
-            params=params,                # shape = [batch_size, max_label_length + 1]
-            indices=self.label_length,    # shape = [batch_size]
+            params=params,  # shape = [batch_size, max_label_length + 1]
+            indices=self._label_length,  # shape = [batch_size]
             batch_dims=1,
         )
         return loss
 
     @cached_property
     def gamma(self) -> tf.Tensor:
-        """ Transition logarithmic probability
+        """Transition logarithmic probability
 
         Returns:    tf.Tensor,
                     shape = [
@@ -87,15 +96,24 @@ class SimplifiedCtcLossData(BaseCtcLossData):
                     dtype = tf.float32
         """
         # This is to avoid InaccessibleTensorError in graph mode
-        _, _, _ = self.horizontal_step_log_proba, self.diagonal_step_log_proba, self.diagonal_gamma
+        _, _, _ = (
+            self.horizontal_step_log_proba,
+            self.diagonal_step_log_proba,
+            self.diagonal_gamma,
+        )
 
         init_tensor = tf.math.log(
             tf.tile(
                 tf.reshape(
-                    tf.eye(self.max_label_length_plus_one),
-                    [1, 1, self.max_label_length_plus_one, self.max_label_length_plus_one]
+                    tf.eye(self._max_label_length_plus_one),
+                    [
+                        1,
+                        1,
+                        self._max_label_length_plus_one,
+                        self._max_label_length_plus_one,
+                    ],
                 ),
-                [self.batch_size, self.max_logit_length_plus_one, 1, 1]
+                [self._batch_size, self._max_logit_length_plus_one, 1, 1],
             )
         )
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_label_length + 1]
@@ -103,7 +121,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             init_tensor=init_tensor,
             iterfunc=self.gamma_step,
             d_i=1,
-            num_iters=self.max_logit_length,
+            num_iters=self._max_logit_length,
             element_shape=tf.TensorShape([None, None, None, None]),
             name="gamma",
         )
@@ -112,8 +130,12 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         gamma_forward = tf.transpose(gamma_forward_transposed, [1, 2, 3, 0, 4])
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_logit_length + 1, max_label_length + 1]
         mask = expand_many_dims(
-            input=tf.linalg.band_part(tf.ones(shape=[self.max_logit_length_plus_one] * 2, dtype=tf.bool), 0, -1),
-            axes=[0, 2, 4]
+            input=tf.linalg.band_part(
+                tf.ones(shape=[self._max_logit_length_plus_one] * 2, dtype=tf.bool),
+                0,
+                -1,
+            ),
+            axes=[0, 2, 4],
         )
         gamma = apply_logarithmic_mask(gamma_forward, mask)
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_logit_length + 1, max_label_length + 1]
@@ -134,9 +156,15 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         Returns:            tf.Tensor,
                             shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_label_length + 1]
         """
-        horizontal_step = expand_many_dims(self.horizontal_step_log_proba[:, i], axes=[1, 2, 3]) + previous_slice
+        horizontal_step = (
+            expand_many_dims(self.horizontal_step_log_proba[:, i], axes=[1, 2, 3])
+            + previous_slice
+        )
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_label_length + 1]
-        diagonal_step = expand_many_dims(self.diagonal_step_log_proba[:, i], axes=[1, 2]) + previous_slice
+        diagonal_step = (
+            expand_many_dims(self.diagonal_step_log_proba[:, i], axes=[1, 2])
+            + previous_slice
+        )
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_label_length + 1]
 
         # We move by one token because it is a diagonal step
@@ -147,7 +175,9 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             y=moved_diagonal_step,
         )
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_label_length + 1]
-        condition = tf.reshape(tf.range(self.max_logit_length_plus_one) <= i, shape=[1, -1, 1, 1])
+        condition = tf.reshape(
+            tf.range(self._max_logit_length_plus_one) <= i, shape=[1, -1, 1, 1]
+        )
         # shape = [1, max_logit_length + 1, 1, 1]
 
         output_slice = tf.where(
@@ -161,14 +191,19 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
     @cached_property
     def last_gamma_slice(self) -> tf.Tensor:
-        """ shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1] """
-        gamma_0 = tf.math.log(tf.eye(self.max_label_length_plus_one))
+        """shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1]"""
+        gamma_0 = tf.math.log(tf.eye(self._max_label_length_plus_one))
         # shape = [max_label_length + 1, max_label_length + 1]
-        gamma_0 = tf.tile(input=tf.expand_dims(gamma_0, 0), multiples=[self.batch_size, 1, 1])
+        gamma_0 = tf.tile(
+            input=tf.expand_dims(gamma_0, 0), multiples=[self._batch_size, 1, 1]
+        )
         # shape = [batch_size, max_label_length + 1, max_label_length + 1]
         gamma_0 = tf.reshape(
             tensor=gamma_0,
-            shape=[self.batch_size * self.max_label_length_plus_one, self.max_label_length_plus_one]
+            shape=[
+                self._batch_size * self._max_label_length_plus_one,
+                self._max_label_length_plus_one,
+            ],
         )
         # shape = [batch_size * (max_label_length + 1), max_label_length + 1]
 
@@ -176,7 +211,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             init_tensor=gamma_0,
             iterfunc=self.beta_step,
             d_i=-1,
-            num_iters=self.max_logit_length,
+            num_iters=self._max_logit_length,
             element_shape=tf.TensorShape([None, None]),
             name="last_gamma_slice_unfold",
         )
@@ -187,11 +222,11 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         last_gamma_slice = tf.reshape(
             last_gamma_slice,
             shape=[
-                self.batch_size,
-                self.max_label_length_plus_one,
-                self.max_logit_length_plus_one,
-                self.max_label_length_plus_one
-            ]
+                self._batch_size,
+                self._max_label_length_plus_one,
+                self._max_logit_length_plus_one,
+                self._max_label_length_plus_one,
+            ],
         )
         # shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1]
 
@@ -199,19 +234,27 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
     @cached_property
     def first_gamma_slice(self) -> tf.Tensor:
-        """ shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1] """
-        gamma_0 = tf.math.log(tf.eye(self.max_label_length_plus_one))
+        """shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1]"""
+        gamma_0 = tf.math.log(tf.eye(self._max_label_length_plus_one))
         # shape = [max_label_length + 1, max_label_length + 1]
-        gamma_0 = tf.tile(input=tf.expand_dims(gamma_0, 0), multiples=[self.batch_size, 1, 1])
+        gamma_0 = tf.tile(
+            input=tf.expand_dims(gamma_0, 0), multiples=[self._batch_size, 1, 1]
+        )
         # shape = [batch_size, max_label_length + 1, max_label_length + 1]
-        gamma_0 = tf.reshape(gamma_0, shape=[self.batch_size * self.max_label_length_plus_one, self.max_label_length_plus_one])
+        gamma_0 = tf.reshape(
+            gamma_0,
+            shape=[
+                self._batch_size * self._max_label_length_plus_one,
+                self._max_label_length_plus_one,
+            ],
+        )
         # shape = [batch_size * (max_label_length + 1), max_label_length + 1]
 
         first_gamma_slice = unfold(
             init_tensor=gamma_0,
             iterfunc=self.alpha_step,
             d_i=1,
-            num_iters=self.max_logit_length,
+            num_iters=self._max_logit_length,
             element_shape=tf.TensorShape([None, None]),
             name="first_gamma_slice_unfold",
         )
@@ -222,11 +265,11 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         first_gamma_slice = tf.reshape(
             first_gamma_slice,
             shape=[
-                self.batch_size,
-                self.max_label_length_plus_one,
-                self.max_logit_length_plus_one,
-                self.max_label_length_plus_one
-            ]
+                self._batch_size,
+                self._max_label_length_plus_one,
+                self._max_logit_length_plus_one,
+                self._max_label_length_plus_one,
+            ],
         )
         # shape = [batch_size, max_label_length + 1, logit_length + 1, label_length + 1]
 
@@ -234,9 +277,14 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
     @cached_property
     def diagonal_gamma(self) -> tf.Tensor:
-        """ shape = [1, 1, max_label_length + 1, max_label_length + 1] """
+        """shape = [1, 1, max_label_length + 1, max_label_length + 1]"""
         return tf.math.log(
-            tf.expand_dims(tf.expand_dims(tf.eye(self.max_label_length_plus_one, dtype=tf.float32), axis=0), axis=0)
+            tf.expand_dims(
+                tf.expand_dims(
+                    tf.eye(self._max_label_length_plus_one, dtype=tf.float32), axis=0
+                ),
+                axis=0,
+            )
         )
 
     @cached_property
@@ -268,7 +316,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             init_tensor=self.last_beta_slice,
             iterfunc=self.beta_step,
             d_i=-1,
-            num_iters=self.max_logit_length,
+            num_iters=self._max_logit_length,
             element_shape=tf.TensorShape([None, None]),
             name="beta",
         )
@@ -276,21 +324,34 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         return tf.transpose(beta_transposed, [1, 0, 2])
 
     def beta_step(self, previous_slice: tf.Tensor, i: tf.Tensor) -> tf.Tensor:
-        horizontal_step = tf.expand_dims(self.horizontal_step_log_proba[:, i], axis=1) + previous_slice
-        # shape = [batch_size, max_label_length + 1]
-        diagonal_step = self.diagonal_step_log_proba[:, i] + tf.roll(previous_slice, shift=-1, axis=1)
-        # shape = [batch_size, max_label_length + 1]
-        new_beta_slice = logsumexp(
-            x=horizontal_step,  # shape = [batch_size, max_label_length + 1]
-            y=diagonal_step,    # shape = [batch_size, max_label_length + 1]
+        """Iteration step for beta computation."""
+        horizontal_step = (
+            tf.expand_dims(self.horizontal_step_log_proba[:, i], axis=1)
+            + previous_slice
         )
-        # shape = [batch_size, max_label_length + 1]
+        # shape: [batch_size, max_label_length + 1]
+        diagonal_step = self.diagonal_step_log_proba[:, i] + tf.roll(
+            previous_slice, shift=-1, axis=1
+        )
+        # shape: [batch_size, max_label_length + 1]
+        new_beta_slice = logsumexp(
+            x=horizontal_step,  # shape: [batch_size, max_label_length + 1]
+            y=diagonal_step,  # shape: [batch_size, max_label_length + 1]
+        )
+        # shape: [batch_size, max_label_length + 1]
         return new_beta_slice
 
     @cached_property
     def last_beta_slice(self) -> tf.Tensor:
-        """ shape = [batch_size, max_label_length + 1] """
-        beta_last = tf.math.log(tf.one_hot(indices=self.label_length, depth=self.max_label_length_plus_one))
+        """Last beta slice for beta computation.
+
+        Returns: shape: [batch_size, max_label_length + 1]
+        """
+        beta_last = tf.math.log(
+            tf.one_hot(
+                indices=self._label_length, depth=self._max_label_length_plus_one
+            )
+        )
         return beta_last
 
     @cached_property
@@ -320,20 +381,20 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             init_tensor=self.first_alpha_slice,
             iterfunc=self.alpha_step,
             d_i=1,
-            num_iters=self.max_logit_length,
+            num_iters=self._max_logit_length,
             element_shape=tf.TensorShape([None, None]),
             name="alpha",
         )
-        # shape = [logit_length + 1, batch_size, label_length + 1]
+        # shape: [logit_length + 1, batch_size, label_length + 1]
 
         return tf.transpose(alpha_transposed, [1, 0, 2])
 
     def alpha_step(
-            self,
-            previous_slice: tf.Tensor,
-            i: tf.Tensor,
-            # horizontal_step_log_proba: tf.Tensor,
-            # diagonal_step_log_proba: tf.Tensor,
+        self,
+        previous_slice: tf.Tensor,
+        i: tf.Tensor,
+        # horizontal_step_log_proba: tf.Tensor,
+        # diagonal_step_log_proba: tf.Tensor,
     ) -> tf.Tensor:
         """Iteration step for alpha computation
 
@@ -342,7 +403,10 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             i:              shape = []
         Returns:            shape = [batch_size] + DIMS + [max_label_length + 1]
         """
-        horizontal_step = tf.expand_dims(self.horizontal_step_log_proba[:, i], axis=1) + previous_slice
+        horizontal_step = (
+            tf.expand_dims(self.horizontal_step_log_proba[:, i], axis=1)
+            + previous_slice
+        )
         # shape = [batch_size, max_label_length + 1]
         diagonal_step = self.diagonal_step_log_proba[:, i] + previous_slice
         # shape = [batch_size, max_label_length + 1]
@@ -362,9 +426,16 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
     @cached_property
     def first_alpha_slice(self) -> tf.Tensor:
-        """ shape = [batch_size, max_label_length + 1] """
-        alpha_0 = tf.math.log(tf.one_hot(indices=0, depth=(self.max_label_length_plus_one)))
-        alpha_0 = tf.tile(input=tf.expand_dims(alpha_0, 0), multiples=[self.batch_size, 1])
+        """First alpha slice for alpha computation.
+
+        Returns: shape: [batch_size, max_label_length + 1]
+        """
+        alpha_0 = tf.math.log(
+            tf.one_hot(indices=0, depth=(self._max_label_length_plus_one))
+        )
+        alpha_0 = tf.tile(
+            input=tf.expand_dims(alpha_0, 0), multiples=[self._batch_size, 1]
+        )
         return alpha_0
 
     @cached_property
@@ -373,7 +444,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
         Returns:    tf.Tensor,  shape = [batch_size, max_logit_length]
         """
-        return self.logproba[:, :, self.blank_token_index]
+        return self._logproba[:, :, self._blank_token_index]
 
     @cached_property
     def diagonal_step_log_proba(self) -> tf.Tensor:
@@ -381,9 +452,11 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
         Returns:    tf.Tensor,  shape = [batch_size, max_logit_length, max_label_length + 1]
         """
-        return self.expected_token_logproba
+        return self._expected_token_logproba
 
-    def combine_transition_probabilities(self, a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
+    def _combine_transition_probabilities(
+        self, a: tf.Tensor, b: tf.Tensor
+    ) -> tf.Tensor:
         """Combines transition logarithmic probabilities.
 
         Args:
@@ -397,25 +470,48 @@ class SimplifiedCtcLossData(BaseCtcLossData):
 
         dims_a = tf.shape(a)[1:-2]
         dims_b = tf.shape(b)[3:]
-        a = tf.reshape(a, shape=[self.batch_size, -1, self.max_logit_length, self.max_label_length_plus_one, 1])
+        a = tf.reshape(
+            a,
+            shape=[
+                self._batch_size,
+                -1,
+                self._max_logit_length,
+                self._max_label_length_plus_one,
+                1,
+            ],
+        )
         # shape = [batch_size, dims_a, max_logit_length, max_label_length + 1, 1]
-        b = tf.reshape(b, shape=[self.batch_size, 1, self.max_logit_length, self.max_label_length_plus_one, -1])
+        b = tf.reshape(
+            b,
+            shape=[
+                self._batch_size,
+                1,
+                self._max_logit_length,
+                self._max_label_length_plus_one,
+                -1,
+            ],
+        )
         # shape = [batch_size, 1, max_logit_length, max_label_length + 1, dims_b]
 
         ab_term = a + b
         # shape = [batch_size, dims_a, max_logit_length, max_label_length + 1, dims_b]
 
-        horizontal_blank_grad_term = \
-            expand_many_dims(self.blank_logproba, axes=[1, 3]) + tf.reduce_logsumexp(ab_term, axis=3)
+        horizontal_blank_grad_term = expand_many_dims(
+            self._blank_logproba, axes=[1, 3]
+        ) + tf.reduce_logsumexp(ab_term, axis=3)
         # shape = [batch_size, dims_a, max_logit_length, dims_b]
 
-        act = a + expand_many_dims(self.expected_token_logproba, [1, 4]) + tf.roll(b, shift=-1, axis=3)
+        act = (
+            a
+            + expand_many_dims(self._expected_token_logproba, [1, 4])
+            + tf.roll(b, shift=-1, axis=3)
+        )
         # shape = [batch_size, dims_a, max_logit_length, max_label_length + 1, dims_b]
 
-        diagonal_non_blank_grad_term = self.select_from_act(act=act, label=self.label)
+        diagonal_non_blank_grad_term = self._select_from_act(act=act, label=self._label)
         # shape = [batch_size, dims_a, max_logit_length, num_tokens, dims_b]
 
-        blank_mask = self.blank_token_index == tf.range(self.num_tokens)
+        blank_mask = self._blank_token_index == tf.range(self._num_tokens)
         # shape = [num_tokens]
 
         output = tf.where(
@@ -426,13 +522,13 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         # shape = [batch_size, dims_a, max_logit_length, num_tokens, dims_b]
         output_shape = tf.concat(
             [
-                tf.expand_dims(self.batch_size, axis=0),
+                tf.expand_dims(self._batch_size, axis=0),
                 dims_a,
-                tf.expand_dims(self.max_logit_length, axis=0),
-                tf.expand_dims(self.num_tokens, axis=0),
-                dims_b
+                tf.expand_dims(self._max_logit_length, axis=0),
+                tf.expand_dims(self._num_tokens, axis=0),
+                dims_b,
             ],
-            axis=0
+            axis=0,
         )
         output_reshaped = tf.reshape(output, shape=output_shape)
 

@@ -45,18 +45,18 @@ class TestClassicCtcLoss(TestCtcLoss):
         self.assertTensorsAlmostEqual(
             tf.constant([[[1, 0], [0, 0]], [[0, 0], [0, 1]]], dtype=tf.float32),
             tf.exp(loss_data.alpha),
-            places=None
+            places=None,
         )
         self.assertTensorsAlmostEqual(
             tf.constant([[[1, 1], [0, 1]], [[0, 0], [1, 1]]], dtype=tf.float32),
             tf.exp(loss_data.beta),
-            places=None
+            places=None,
         )
-        self.assertEqual(0., loss_data.loss.numpy()[0])
+        self.assertEqual(0.0, loss_data.loss.numpy()[0])
         self.assertTensorsAlmostEqual(
-            first=tf.constant([[[0., 1., 0.]]]),
+            first=tf.constant([[[0.0, 1.0, 0.0]]]),
             second=tf.exp(loss_data.logarithmic_logproba_gradient),
-            places=6
+            places=6,
         )
 
     def test_closed_state(self):
@@ -76,24 +76,35 @@ class TestClassicCtcLoss(TestCtcLoss):
         )
 
         self.assertTensorsAlmostEqual(
-            tf.constant([[[[1, 0], [0, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0]]]], dtype=tf.float32),
+            tf.constant(
+                [[[[1, 0], [0, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0]]]],
+                dtype=tf.float32,
+            ),
             tf.exp(loss_data.alpha),
-            places=None
+            places=None,
         )
         self.assertTensorsAlmostEqual(
-            tf.constant([[[[1, 1], [0, 1]], [[0, 0], [1, 1]], [[0, 0], [1, 1]]]], dtype=tf.float32),
+            tf.constant(
+                [[[[1, 1], [0, 1]], [[0, 0], [1, 1]], [[0, 0], [1, 1]]]],
+                dtype=tf.float32,
+            ),
             tf.exp(loss_data.beta),
-            places=None
+            places=None,
         )
-        self.assertEqual(0., loss_data.loss.numpy()[0])
+        self.assertEqual(0.0, loss_data.loss.numpy()[0])
         self.assertTensorsAlmostEqual(
-            first=tf.constant([[[0., 1., 0.], [1., 0., 0.]]]),
+            first=tf.constant([[[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]]),
             second=tf.exp(loss_data.logarithmic_logproba_gradient),
-            places=6
+            places=6,
         )
 
     def test_classic_loss_simple_case(self):
-        logit = tf.math.log(tf.constant([[[0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 0, 1], [0, 1, 0]]], dtype=tf.float32))
+        logit = tf.math.log(
+            tf.constant(
+                [[[0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 0, 1], [0, 1, 0]]],
+                dtype=tf.float32,
+            )
+        )
         label = tf.constant([[1, 2, 2, 1]], dtype=tf.int32)
         length_label = tf.constant([4], dtype=tf.int32)
         length_logit = tf.constant([5], dtype=tf.int32)
@@ -110,20 +121,25 @@ class TestClassicCtcLoss(TestCtcLoss):
 
         self.assertLess(loss_data.loss.numpy()[0], 1e-6)
         self.assertTensorsAlmostEqual(
-            first=tf.constant([[
-                [0., 1., 0.],
-                [0., 0., 1.],
-                [1., 0., 0.],
-                [0., 0., 1.],
-                [0., 1., 0.],
-            ]]),
+            first=tf.constant(
+                [
+                    [
+                        [0.0, 1.0, 0.0],
+                        [0.0, 0.0, 1.0],
+                        [1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0],
+                        [0.0, 1.0, 0.0],
+                    ]
+                ]
+            ),
             second=tf.exp(loss_data.logarithmic_logproba_gradient),
-            places=6
+            places=6,
         )
 
     def test_alpha_beta_sum(self):
-        input_dict = \
-            generate_ctc_loss_inputs(max_logit_length=6, batch_size=1, random_seed=0, num_tokens=5, blank_index=0)
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=6, batch_size=1, random_seed=0, num_tokens=5, blank_index=0
+        )
         loss_data = ClassicCtcLossData(
             labels=input_dict["labels"],
             logprobas=input_dict["logprobas"],
@@ -160,12 +176,17 @@ class TestClassicCtcLoss(TestCtcLoss):
             blank_index=blank_index,
         )
 
-        self.assertAlmostEqual(-np.log(1/3 * 1/3), loss_data.loss.numpy()[0], 6)
-        self.assertAlmostEqual(-np.log(3 * 1/3 * 1/3), loss_data.loss.numpy()[1], 6)
+        self.assertAlmostEqual(-np.log(1 / 3 * 1 / 3), loss_data.loss.numpy()[0], 6)
+        self.assertAlmostEqual(-np.log(3 * 1 / 3 * 1 / 3), loss_data.loss.numpy()[1], 6)
         self.assertTensorsAlmostEqual(
-            first=tf.constant([[[0., -1., 0.], [0., 0., -1.]],  [[-1/3, -2/3, 0.], [-1/3, -2/3, 0.]]]),
+            first=tf.constant(
+                [
+                    [[0.0, -1.0, 0.0], [0.0, 0.0, -1.0]],
+                    [[-1 / 3, -2 / 3, 0.0], [-1 / 3, -2 / 3, 0.0]],
+                ]
+            ),
             second=loss_data.gradient,
-            places=6
+            places=6,
         )
 
     def test_too_short_logit(self):
@@ -187,16 +208,26 @@ class TestClassicCtcLoss(TestCtcLoss):
             blank_index=blank_index,
         )
 
-        self.assertTensorsAlmostEqual(tf.constant([np.inf]), loss_data.loss, places=None)
+        self.assertTensorsAlmostEqual(
+            tf.constant([np.inf]), loss_data.loss, places=None
+        )
         self.assertTensorsAlmostEqual(
             tf.zeros(shape=[batch_size, max_logit_length, num_tokens]),
             loss_data.gradient,
-            places=None
+            places=None,
         )
         self.assertTensorsAlmostEqual(
-            tf.zeros(shape=[batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens]),
+            tf.zeros(
+                shape=[
+                    batch_size,
+                    max_logit_length,
+                    num_tokens,
+                    max_logit_length,
+                    num_tokens,
+                ]
+            ),
             loss_data.hessian,
-            places=None
+            places=None,
         )
 
     def test_repeated_token(self):
@@ -217,7 +248,7 @@ class TestClassicCtcLoss(TestCtcLoss):
         )
 
         # Label "aa" corresponds to a single paths: "a_a" with probability 3 ** -3
-        self.assertAlmostEqual(np.log(3 ** 3), loss_data.loss.numpy()[0], 6)
+        self.assertAlmostEqual(np.log(3**3), loss_data.loss.numpy()[0], 6)
 
     def test_single_token(self):
         num_tokens = 3
@@ -237,7 +268,7 @@ class TestClassicCtcLoss(TestCtcLoss):
         )
 
         # Label "a" corresponds to 6 paths: "a__", "_a_", "__a", "aa_", "_aa", and "aaa" with equal probability 3 ** -3
-        self.assertAlmostEqual(np.log(3 ** 3 / 6), loss_data.loss.numpy()[0], 6)
+        self.assertAlmostEqual(np.log(3**3 / 6), loss_data.loss.numpy()[0], 6)
 
     def test_wrong_prediction_case(self):
         logit = tf.constant([[[0, 0, 1]]], dtype=tf.float32) * 100
@@ -256,11 +287,11 @@ class TestClassicCtcLoss(TestCtcLoss):
         )
 
         self.assertTensorsAlmostEqual(
-            tf.constant([[[0., -1., 0.]]], dtype=tf.float32),
+            tf.constant([[[0.0, -1.0, 0.0]]], dtype=tf.float32),
             loss_data.gradient,
-            places=None
+            places=None,
         )
-        self.assertEqual(100., loss_data.loss.numpy()[0])
+        self.assertEqual(100.0, loss_data.loss.numpy()[0])
 
     def test_zero_batch_size_with_autograph(self):
         logits = tf.zeros(shape=[0, 4, 3], dtype=tf.float32)
@@ -272,7 +303,9 @@ class TestClassicCtcLoss(TestCtcLoss):
         def func():
             with tf.GradientTape() as tape:
                 tape.watch([logits])
-                loss_samplewise = classic_ctc_loss(labels, logits, label_length, logit_length, 0)
+                loss_samplewise = classic_ctc_loss(
+                    labels, logits, label_length, logit_length, 0
+                )
                 loss = tf.reduce_sum(loss_samplewise)
             gradient = tape.gradient(loss, sources=logits)
             return loss_samplewise, gradient
@@ -283,8 +316,13 @@ class TestClassicCtcLoss(TestCtcLoss):
         self.assertEqual([0, 4, 3], gradient.shape)
 
     def test_compare_forward_with_tf_implementation(self):
-        input_dict = \
-            generate_ctc_loss_inputs(max_logit_length=20, batch_size=8, random_seed=0, num_tokens=8, blank_index=0)
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=20,
+            batch_size=8,
+            random_seed=0,
+            num_tokens=8,
+            blank_index=0,
+        )
         tf_ctc_loss = tf.nn.ctc_loss(
             labels=input_dict["labels"],
             logits=input_dict["logits"],
@@ -311,7 +349,7 @@ class TestClassicCtcLoss(TestCtcLoss):
             batch_size=8,
             random_seed=0,
             num_tokens=10,
-            blank_index=blank_index
+            blank_index=blank_index,
         )
 
         with tf.GradientTape(persistent=True) as tape:
@@ -358,9 +396,7 @@ class TestClassicCtcLoss(TestCtcLoss):
             )
 
         gradient_numerical = finite_difference_batch_jacobian(
-            func=loss_fn,
-            x=logits,
-            epsilon=1e-3
+            func=loss_fn, x=logits, epsilon=1e-3
         )
 
         with tf.GradientTape() as tape:
@@ -377,7 +413,9 @@ class TestClassicCtcLoss(TestCtcLoss):
 
         loss = classic_ctc_loss(
             labels=tf.constant([[1, 2, 2, 1]], dtype=tf.int32),
-            logits=tf.zeros(shape=[batch_size, logit_length, num_token], dtype=tf.float32),
+            logits=tf.zeros(
+                shape=[batch_size, logit_length, num_token], dtype=tf.float32
+            ),
             label_length=tf.constant([4], dtype=tf.int32),
             logit_length=tf.constant([logit_length], dtype=tf.int32),
             blank_index=0,
@@ -387,14 +425,13 @@ class TestClassicCtcLoss(TestCtcLoss):
         batch_size = 2
         num_tokens = 3
         max_logit_length = 4
-        input_dict = \
-            generate_ctc_loss_inputs(
-                max_logit_length=max_logit_length,
-                batch_size=batch_size,
-                random_seed=0,
-                num_tokens=num_tokens,
-                blank_index=0
-            )
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=max_logit_length,
+            batch_size=batch_size,
+            random_seed=0,
+            num_tokens=num_tokens,
+            blank_index=0,
+        )
         logprobas = input_dict["logprobas"]
 
         with tf.GradientTape(persistent=True) as tape1:
@@ -410,49 +447,48 @@ class TestClassicCtcLoss(TestCtcLoss):
                     ctc_loss_data_cls=ClassicCtcLossData,
                 )
             gradient_analytic = tape2.gradient(loss, sources=logprobas)
-        hessian_analytic = tape1.batch_jacobian(gradient_analytic, source=logprobas, experimental_use_pfor=False)
+        hessian_analytic = tape1.batch_jacobian(
+            gradient_analytic, source=logprobas, experimental_use_pfor=False
+        )
 
         self.assertEqual(
             [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens],
-            list(hessian_analytic.shape)
+            list(hessian_analytic.shape),
         )
 
     @unittest.skip("fix_finite_difference")
     def test_hessian_vs_finite_difference(self):
-        input_dict = \
-            generate_ctc_loss_inputs(
-                max_logit_length=4,
-                batch_size=2,
-                random_seed=0,
-                num_tokens=2,
-                blank_index=0
-            )
+        input_dict = generate_ctc_loss_inputs(
+            max_logit_length=4, batch_size=2, random_seed=0, num_tokens=2, blank_index=0
+        )
         logits = input_dict["logits"]
 
         def gradient_fn(logits):
             with tf.GradientTape() as tape:
                 tape.watch([logits])
-                loss = tf.reduce_sum(classic_ctc_loss(
-                    labels=input_dict["labels"],
-                    logits=logits,
-                    label_length=input_dict["label_length"],
-                    logit_length=input_dict["logit_length"],
-                    blank_index=0,
-                ))
+                loss = tf.reduce_sum(
+                    classic_ctc_loss(
+                        labels=input_dict["labels"],
+                        logits=logits,
+                        label_length=input_dict["label_length"],
+                        logit_length=input_dict["logit_length"],
+                        blank_index=0,
+                    )
+                )
             gradient = tape.gradient(loss, sources=logits)
             # shape = [batch_size, logit_length, num_tokens]
             return gradient
 
         hessain_numerical = finite_difference_batch_jacobian(
-            func=gradient_fn,
-            x=logits,
-            epsilon=1e-4
+            func=gradient_fn, x=logits, epsilon=1e-4
         )
         # shape = [batch_size, logit_length, num_tokens, logit_length, num_tokens]
 
         with tf.GradientTape(persistent=True) as tape:
             tape.watch([logits])
             gradient = gradient_fn(logits)
-        hessain_analytic = tape.batch_jacobian(gradient, source=logits, experimental_use_pfor=False)
+        hessain_analytic = tape.batch_jacobian(
+            gradient, source=logits, experimental_use_pfor=False
+        )
 
         self.assertTensorsAlmostEqual(hessain_numerical, hessain_analytic, 2)
