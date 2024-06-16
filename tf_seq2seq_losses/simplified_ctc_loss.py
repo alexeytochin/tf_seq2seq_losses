@@ -1,5 +1,6 @@
 """Simplified version of CTC (Connectionist Temporal Classification) loss."""
 
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -329,23 +330,23 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             tf.expand_dims(self.horizontal_step_log_proba[:, i], axis=1)
             + previous_slice
         )
-        # shape: [batch_size, max_label_length + 1]
+        # shape = [batch_size, max_label_length + 1]
         diagonal_step = self.diagonal_step_log_proba[:, i] + tf.roll(
             previous_slice, shift=-1, axis=1
         )
-        # shape: [batch_size, max_label_length + 1]
+        # shape = [batch_size, max_label_length + 1]
         new_beta_slice = logsumexp(
-            x=horizontal_step,  # shape: [batch_size, max_label_length + 1]
-            y=diagonal_step,  # shape: [batch_size, max_label_length + 1]
+            x=horizontal_step,  # shape = [batch_size, max_label_length + 1]
+            y=diagonal_step,  # shape = [batch_size, max_label_length + 1]
         )
-        # shape: [batch_size, max_label_length + 1]
+        # shape = [batch_size, max_label_length + 1]
         return new_beta_slice
 
     @cached_property
     def last_beta_slice(self) -> tf.Tensor:
         """Last beta slice for beta computation.
 
-        Returns: shape: [batch_size, max_label_length + 1]
+        Returns: shape = [batch_size, max_label_length + 1]
         """
         beta_last = tf.math.log(
             tf.one_hot(
@@ -385,7 +386,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
             element_shape=tf.TensorShape([None, None]),
             name="alpha",
         )
-        # shape: [logit_length + 1, batch_size, label_length + 1]
+        # shape = [logit_length + 1, batch_size, label_length + 1]
 
         return tf.transpose(alpha_transposed, [1, 0, 2])
 
@@ -393,8 +394,6 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         self,
         previous_slice: tf.Tensor,
         i: tf.Tensor,
-        # horizontal_step_log_proba: tf.Tensor,
-        # diagonal_step_log_proba: tf.Tensor,
     ) -> tf.Tensor:
         """Iteration step for alpha computation
 
@@ -428,7 +427,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
     def first_alpha_slice(self) -> tf.Tensor:
         """First alpha slice for alpha computation.
 
-        Returns: shape: [batch_size, max_label_length + 1]
+        Returns: shape = [batch_size, max_label_length + 1]
         """
         alpha_0 = tf.math.log(
             tf.one_hot(indices=0, depth=self._max_label_length_plus_one)

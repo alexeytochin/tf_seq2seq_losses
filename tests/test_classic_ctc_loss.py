@@ -160,7 +160,7 @@ class TestClassicCtcLoss(TestCtcLoss):
         # Sums along U of products alpha * beta that is supposed to be equal to the loss function
         sums = tf.reduce_logsumexp(loss_data.alpha + loss_data.beta, axis=[2, 3])
 
-        # We verify that the values of the sums a equal to the loss up to a sign.
+        # We verify that the values of the sums `a` equal to the loss up to a sign.
         self.assert_tensors_almost_equal(
             first=-tf.expand_dims(loss_data.loss, 1),
             second=sums,
@@ -499,13 +499,13 @@ class TestClassicCtcLoss(TestCtcLoss):
                     )
                 )
             gradient = tape.gradient(loss, sources=logits)
-            # shape: [batch_size, logit_length, num_tokens]
+            # shape = [batch_size, logit_length, num_tokens]
             return gradient
 
-        hessain_numerical = finite_difference_batch_jacobian(
+        hessian_numerical = finite_difference_batch_jacobian(
             func=gradient_fn, x=logits, epsilon=1e-4
         )
-        # shape: [batch_size, logit_length, num_tokens, logit_length, num_tokens]
+        # shape = [batch_size, logit_length, num_tokens, logit_length, num_tokens]
 
         with tf.GradientTape(persistent=True) as tape:
             tape.watch([logits])
@@ -514,4 +514,4 @@ class TestClassicCtcLoss(TestCtcLoss):
             gradient, source=logits, experimental_use_pfor=False
         )
 
-        self.assert_tensors_almost_equal(hessain_numerical, hessain_analytic, 2)
+        self.assert_tensors_almost_equal(hessian_numerical, hessain_analytic, 2)

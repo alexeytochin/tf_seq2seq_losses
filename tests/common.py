@@ -32,13 +32,13 @@ def tf_ctc_loss(
     """Wrapper for tf.nn.ctc_loss
 
     Args:
-        labels:         labels,         shape: [batch_size, max_label_length]
-        logits:         logits,         shape: [batch_size, max_logit_length, num_tokens]
-        label_length:   label length,   shape: [batch_size]
-        logit_length:   logit length,   shape: [batch_size]
-        blank_index:    blank index,    shape: []
+        labels:         labels,         shape = [batch_size, max_label_length]
+        logits:         logits,         shape = [batch_size, max_logit_length, num_tokens]
+        label_length:   label length,   shape = [batch_size]
+        logit_length:   logit length,   shape = [batch_size]
+        blank_index:    blank index,    shape = []
 
-    Returns:            loss value,     shape: [batch_size]
+    Returns:            loss value,     shape = [batch_size]
     """
     return tf.nn.ctc_loss(
         labels=labels,

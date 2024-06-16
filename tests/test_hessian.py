@@ -165,13 +165,13 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
                     )
                 )
             gradient = tape.gradient(loss, sources=logits)
-            # shape: [batch_size, logit_length, num_tokens]
+            # shape = [batch_size, logit_length, num_tokens]
             return gradient
 
         hessain_numerical = finite_difference_batch_jacobian(
             func=gradient_fn, x=logits, epsilon=1e-4
         )
-        # shape: [batch_size, logit_length, num_tokens, logit_length, num_tokens]
+        # shape = [batch_size, logit_length, num_tokens, logit_length, num_tokens]
 
         with tf.GradientTape() as tape:
             tape.watch([logits])

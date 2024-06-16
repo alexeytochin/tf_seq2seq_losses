@@ -57,15 +57,15 @@ def finite_difference_batch_jacobian(
     dims_x = tf.shape(x)[1:]
     batch_size = tf.shape(x)[0]
     x_reshaped = tf.reshape(x, [batch_size, -1])
-    # shape: [batch_size, dim_x]
+    # shape = [batch_size, dim_x]
 
     def func_(x_: tf.Tensor) -> tf.Tensor:
         """Argument for _finite_difference_batch_jacobian
 
         Args:
-            x_:     shape: [batch_size, dim_x]
+            x_:     shape = [batch_size, dim_x]
 
-        Returns:    shape: [batch_size, dim_y]
+        Returns:    shape = [batch_size, dim_y]
         """
         x_orig = tf.reshape(x_, shape=tf.concat([[-1], dims_x], axis=0))
         # shape = [batch_size] + DIM_x
@@ -78,10 +78,10 @@ def finite_difference_batch_jacobian(
     dy_reshaped = _finite_difference_batch_jacobian(
         func=func_, x=x_reshaped, epsilon=epsilon
     )
-    # shape: [batch_size] + DIMS_y + DIMS_x
+    # shape = [batch_size] + DIMS_y + DIMS_x
     dy_shape = tf.concat([tf.expand_dims(batch_size, 0), dims_y, dims_x], axis=0)
     dy = tf.reshape(dy_reshaped, shape=dy_shape)
-    # shape: [batch_size] + DIMS_y + DIMS_x
+    # shape = [batch_size] + DIMS_y + DIMS_x
 
     return dy
 
@@ -89,7 +89,7 @@ def finite_difference_batch_jacobian(
 def _finite_difference_batch_jacobian(
     func, x, epsilon: Union[float, tf.Tensor]
 ) -> tf.Tensor:
-    """
+    """Calculate final difference Jacobian approximation
 
     Args:
         func:   shape = [batch_size, dim_x] -> [batch_size, dim_y]
@@ -99,15 +99,15 @@ def _finite_difference_batch_jacobian(
     """
     dim_x = tf.shape(x)[1]
     dx = tf.expand_dims(tf.eye(dim_x, dtype=x.dtype), axis=1) * epsilon
-    # shape: [dim_x, 1, dim_x]
+    # shape = [dim_x, 1, dim_x]
     pre_x1 = tf.expand_dims(x, 0) + dx
-    # shape: [dim_x, batch_size, dim_x]
+    # shape = [dim_x, batch_size, dim_x]
     y0 = func(x)
-    # shape: [batch_size, dim_y]
+    # shape = [batch_size, dim_y]
     dy_transposed = (
         tf.vectorized_map(fn=func, elems=pre_x1) - tf.expand_dims(y0, 0)
     ) / epsilon
-    # shape: [dim_x, batch_size, dim_y]
+    # shape = [dim_x, batch_size, dim_y]
     dy = tf.transpose(dy_transposed, perm=[1, 2, 0])
 
     return dy
