@@ -1,0 +1,8 @@
+[MASTER]
+init-hook = 'import sys; sys.path.append(".")'
+[FORMAT]
+max-line-length = 120
+max-args = 7
+max-attributes = 10
+max-locals = 20
+disable=logging-fstring-interpolation, duplicate-code

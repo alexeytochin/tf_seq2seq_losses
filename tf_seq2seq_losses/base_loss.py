@@ -1,3 +1,6 @@
+"""Base class for CTC loss data."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,20 +19,29 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Union, Type
+from functools import cached_property
 import tensorflow as tf
-from cached_property import cached_property
 
-from tf_seq2seq_losses.tools import logit_to_logproba, pad_until, reduce_max_with_default, unsorted_segment_logsumexp, \
-    apply_logarithmic_mask, smart_transpose, smart_reshape, expand_many_dims, inf
+from tf_seq2seq_losses.tools import (
+    logit_to_logproba,
+    pad_until,
+    reduce_max_with_default,
+    unsorted_segment_logsumexp,
+    apply_logarithmic_mask,
+    smart_transpose,
+    smart_reshape,
+    expand_many_dims,
+    inf,
+)
 
 
 def ctc_loss(
-        labels: tf.Tensor,
-        logits: tf.Tensor,
-        label_length: tf.Tensor,
-        logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor],
-        ctc_loss_data_cls: Type[BaseCtcLossData],
+    labels: tf.Tensor,
+    logits: tf.Tensor,
+    label_length: tf.Tensor,
+    logit_length: tf.Tensor,
+    blank_index: Union[int, tf.Tensor],
+    ctc_loss_data_cls: Type[BaseCtcLossData],
 ) -> tf.Tensor:
     """Computes a version of CTC loss from
     http://www.cs.toronto.edu/~graves/icml_2006.pdf.
@@ -57,12 +69,12 @@ def ctc_loss(
 
 
 def ctc_loss_from_logproba(
-        labels: tf.Tensor,
-        logprobas: tf.Tensor,
-        label_length: tf.Tensor,
-        logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor],
-        ctc_loss_data_cls: Type[BaseCtcLossData],
+    labels: tf.Tensor,
+    logprobas: tf.Tensor,
+    label_length: tf.Tensor,
+    logit_length: tf.Tensor,
+    blank_index: Union[int, tf.Tensor],
+    ctc_loss_data_cls: Type[BaseCtcLossData],
 ) -> tf.Tensor:
     """Computes a version of CTC loss from logarothmic probabilities considered as independent parameters.
 
@@ -88,16 +100,17 @@ def ctc_loss_from_logproba(
 
 
 class BaseCtcLossData(ABC):
-    """ Base class for CTC loss data. """
+    """Base class for CTC loss data."""
+
     def __init__(
-            self,
-            labels: tf.Tensor,
-            logprobas: tf.Tensor,
-            label_length: tf.Tensor,
-            logit_length: tf.Tensor,
-            blank_index: Union[int, tf.Tensor],
-            swap_memory: bool = False,
-            **kwargs
+        self,
+        labels: tf.Tensor,
+        logprobas: tf.Tensor,
+        label_length: tf.Tensor,
+        logit_length: tf.Tensor,
+        blank_index: Union[int, tf.Tensor],
+        swap_memory: bool = False,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self._logprobas = logprobas
@@ -126,26 +139,47 @@ class BaseCtcLossData(ABC):
 
     @tf.custom_gradient
     def forward_fn(self, unused_logprobas: tf.Tensor) -> tf.Tensor:
+        """Forward pass of the loss function.
+
+        Args:
+            unused_logprobas: shape = [batch_size, max_logit_length, num_tokens]
+
+        Returns: shape = [batch_size]
+        """
+
         def backprop(d_loss):
-            return expand_many_dims(d_loss, axes=[1, 2]) * self.gradient_fn(unused_logprobas)
+            return expand_many_dims(d_loss, axes=[1, 2]) * self.gradient_fn(
+                unused_logprobas
+            )
 
         return self.loss, backprop
 
     @tf.custom_gradient
     def gradient_fn(self, unused_logprobas: tf.Tensor) -> tf.Tensor:
+        """Gradient of loss w.r.t. input logits.
+
+        Args:
+            unused_logprobas: shape = [batch_size, max_logit_length, num_tokens]
+
+        Returns: shape = [batch_size, max_logit_length, num_tokens]
+        """
+
         def backprop(d_gradient):
             output = tf.reduce_sum(
-                input_tensor=expand_many_dims(d_gradient, axes=[1, 2]) * self.hessian_fn(unused_logprobas),
-                axis=[3, 4]
+                input_tensor=expand_many_dims(d_gradient, axes=[1, 2])
+                * self._hessian_fn(unused_logprobas),
+                axis=[3, 4],
             )
             return output
 
         return self.gradient, backprop
 
     @tf.custom_gradient
-    def hessian_fn(self, unused_logprobas: tf.Tensor) -> tf.Tensor:
+    def _hessian_fn(self, unused_logprobas: tf.Tensor) -> tf.Tensor:
         def backprop(d_hessian):
-            raise NotImplementedError(f"Third order derivative over the ctc loss function is not implemented.")
+            raise NotImplementedError(
+                "Third order derivative over the ctc loss function is not implemented."
+            )
 
         return self.hessian, backprop
 
@@ -155,31 +189,42 @@ class BaseCtcLossData(ABC):
 
         Returns: tf.Tensor, shape = [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens]
         """
-        alpha_gamma_term = self.combine_transition_probabilities(a=self.alpha[:, :-1], b=self.gamma[:, 1:])
+        alpha_gamma_term = self._combine_transition_probabilities(
+            a=self.alpha[:, :-1], b=self.gamma[:, 1:]
+        )
         # shape = [batch_size, max_logit_length, num_tokens, max_logit_length + 1, max_label_length + 1]
-        alpha_gamma_beta_term = \
-            self.combine_transition_probabilities(a=alpha_gamma_term[:, :, :, :-1], b=self.beta[:, 1:])
+        alpha_gamma_beta_term = self._combine_transition_probabilities(
+            a=alpha_gamma_term[:, :, :, :-1], b=self.beta[:, 1:]
+        )
         # shape = [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens]
-        alpha_gamma_beta_loss_term = expand_many_dims(self.loss, axes=[1, 2, 3, 4]) + alpha_gamma_beta_term
+        alpha_gamma_beta_loss_term = (
+            expand_many_dims(self.loss, axes=[1, 2, 3, 4]) + alpha_gamma_beta_term
+        )
         # shape = [batch_size, max_logit_length, num_tokens]
-        logit_length_x_num_tokens = self.max_logit_length * self.num_tokens
+        logit_length_x_num_tokens = self._max_logit_length * self._num_tokens
         first_term = tf.reshape(
             tf.linalg.set_diag(
                 input=tf.reshape(
                     tensor=alpha_gamma_beta_loss_term,
-                    shape=[self.batch_size, logit_length_x_num_tokens, logit_length_x_num_tokens]
+                    shape=[
+                        self._batch_size,
+                        logit_length_x_num_tokens,
+                        logit_length_x_num_tokens,
+                    ],
                 ),
                 diagonal=tf.reshape(
                     tensor=self.logarithmic_logproba_gradient,
-                    shape=[self.batch_size, logit_length_x_num_tokens]
-                )
+                    shape=[self._batch_size, logit_length_x_num_tokens],
+                ),
             ),
             shape=tf.shape(alpha_gamma_beta_term),
         )
 
         mask = expand_many_dims(
-            input=tf.linalg.band_part(tf.ones(shape=[self.max_logit_length] * 2, dtype=tf.bool), 0, -1),
-            axes=[0, 2, 4]
+            x=tf.linalg.band_part(
+                tf.ones(shape=[self._max_logit_length] * 2, dtype=tf.bool), 0, -1
+            ),
+            axes=[0, 2, 4],
         )
         symmetrized_first_term = tf.where(
             condition=mask,
@@ -187,9 +232,9 @@ class BaseCtcLossData(ABC):
             y=tf.transpose(first_term, [0, 3, 4, 1, 2]),
         )
         # shape = [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens]
-        hessian = \
-            -tf.exp(symmetrized_first_term) \
-            + expand_many_dims(self.gradient, [3, 4]) * expand_many_dims(self.gradient, [1, 2])
+        hessian = -tf.exp(symmetrized_first_term) + expand_many_dims(
+            self.gradient, [3, 4]
+        ) * expand_many_dims(self.gradient, [1, 2])
         # shape = [batch_size, max_logit_length, num_tokens, max_logit_length, num_tokens]
 
         # Filter out samples with infinite loss
@@ -202,21 +247,24 @@ class BaseCtcLossData(ABC):
 
         # Filter out logits that beyond logits length
         hessian = tf.where(
-            condition=expand_many_dims(self.logit_length_mask, axes=[2, 3, 4]),
+            condition=expand_many_dims(self._logit_length_mask, axes=[2, 3, 4]),
             x=hessian,
-            y=0.
+            y=0.0,
         )
         hessian = tf.where(
-            condition=expand_many_dims(self.logit_length_mask, axes=[1, 2, 4]),
+            condition=expand_many_dims(self._logit_length_mask, axes=[1, 2, 4]),
             x=hessian,
-            y=0.
+            y=0.0,
         )
 
         return hessian
 
     @cached_property
     def gradient(self) -> tf.Tensor:
-        # shape = [batch_size, max_logit_length, num_tokens]
+        """Gradient of loss w.r.t. input logits.
+
+        Returns: shape = [batch_size, max_logit_length, num_tokens]
+        """
         return -tf.exp(self.logarithmic_logproba_gradient)
 
     @cached_property
@@ -225,9 +273,11 @@ class BaseCtcLossData(ABC):
 
         Returns: tf.Tensor, shape = [batch_size, max_logit_length, num_tokens]
         """
-        logarithmic_logproba_gradient = \
-            tf.reshape(self.loss, [-1, 1, 1]) \
-            + self.combine_transition_probabilities(a=self.alpha[:, :-1], b=self.beta[:, 1:])
+        logarithmic_logproba_gradient = tf.reshape(
+            self.loss, [-1, 1, 1]
+        ) + self._combine_transition_probabilities(
+            a=self.alpha[:, :-1], b=self.beta[:, 1:]
+        )
         # shape = [batch_size, max_logit_length, num_tokens]
 
         # Filter out samples infinite loss
@@ -241,7 +291,7 @@ class BaseCtcLossData(ABC):
         # Filter out logits that beyond logits length
         logarithmic_logproba_gradient = apply_logarithmic_mask(
             tensor=logarithmic_logproba_gradient,
-            mask=tf.expand_dims(self.logit_length_mask, axis=2),
+            mask=tf.expand_dims(self._logit_length_mask, axis=2),
         )
         # shape = [batch_size, max_logit_length, num_tokens]
 
@@ -250,36 +300,46 @@ class BaseCtcLossData(ABC):
     @property
     @abstractmethod
     def alpha(self) -> tf.Tensor:
-        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, ...]
+        """Alpha tensor.
+
+        Returns: shape = [batch_size, max_logit_length + 1, max_label_length + 1, ...]
+        """
         raise NotImplementedError()
 
     @property
     @abstractmethod
     def beta(self) -> tf.Tensor:
-        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, ...]
+        """Beta tensor.
+
+        Returns: shape = [batch_size, max_logit_length + 1, max_label_length + 1, ...]
+        """
         raise NotImplementedError()
 
     @property
     @abstractmethod
     def gamma(self) -> tf.Tensor:
-        # shape = [batch_size, max_logit_length + 1, max_label_length + 1, ...,
-        #   max_logit_length + 1, max_label_length + 1, ...]
+        """Gamma tensor.
+
+        Returns: shape =
+            [batch_size, max_logit_length + 1, max_label_length + 1, max_logit_length + 1, max_label_length + 1, ...]
+        """
         raise NotImplementedError()
 
     @cached_property
-    def expected_token_logproba(self) -> tf.Tensor:
+    def _expected_token_logproba(self) -> tf.Tensor:
         """Logarithmic probability to predict label token.
 
         Returns:shape = [batch_size, max_logit_length, max_label_length + 1]
         """
         label_logproba = tf.gather(
-            params=self.logproba,
-            indices=self.label,
+            params=self._logproba,
+            indices=self._label,
             axis=2,
             batch_dims=1,
         )
-        expected_token_logproba = \
-            apply_logarithmic_mask(label_logproba, tf.expand_dims(self.label_length_mask, axis=1))
+        expected_token_logproba = apply_logarithmic_mask(
+            label_logproba, tf.expand_dims(self._label_length_mask, axis=1)
+        )
         # shape = [batch_size, max_logit_length, max_label_length + 1]
         return expected_token_logproba
 
@@ -293,32 +353,38 @@ class BaseCtcLossData(ABC):
         raise NotImplementedError()
 
     @cached_property
-    def label_token_logproba(self) -> tf.Tensor:
-        """ shape = [batch_size, max_logit_length, max_label_length + 1] """
+    def _label_token_logproba(self) -> tf.Tensor:
+        """shape = [batch_size, max_logit_length, max_label_length + 1]"""
         return tf.gather(
-            params=self.logproba,
-            indices=self.label,
+            params=self._logproba,
+            indices=self._label,
             axis=2,
             batch_dims=1,
         )
 
     @cached_property
-    def blank_logproba(self):
+    def _blank_logproba(self):
         """Calculates logarithmic probability to predict blank token for given logit.
 
         Returns:    tf.Tensor, shape = [batch_size, max_logit_length]
         """
-        return self.logproba[:, :, self.blank_token_index]
+        return self._logproba[:, :, self._blank_token_index]
 
     @cached_property
-    def input_proba(self) -> tf.Tensor:
-        """ shape = [batch_size, input_logit_tensor_length, num_tokens], dtype = tf.float32 """
-        return tf.exp(self.logproba)
+    def _input_proba(self) -> tf.Tensor:
+        """shape = [batch_size, input_logit_tensor_length, num_tokens], dtype = tf.float32"""
+        return tf.exp(self._logproba)
 
     @cached_property
-    def logproba(self) -> tf.Tensor:
-        mask = tf.expand_dims(tf.sequence_mask(lengths=self._logit_length, maxlen=self.max_logit_length), 2)
-        blank_logprobas = tf.reshape(tf.math.log(tf.one_hot(self.blank_token_index, self.num_tokens)), shape=[1, 1, -1])
+    def _logproba(self) -> tf.Tensor:
+        mask = tf.expand_dims(
+            tf.sequence_mask(lengths=self._logit_length, maxlen=self._max_logit_length),
+            2,
+        )
+        blank_logprobas = tf.reshape(
+            tf.math.log(tf.one_hot(self._blank_token_index, self._num_tokens)),
+            shape=[1, 1, -1],
+        )
         logprobas = tf.where(
             condition=mask,
             x=self._logprobas,
@@ -327,21 +393,23 @@ class BaseCtcLossData(ABC):
         return logprobas
 
     @cached_property
-    def cleaned_label(self) -> tf.Tensor:
-        """ shape = [batch, max_label_length + 1] """
-        _ = self.max_label_length_plus_one
+    def _cleaned_label(self) -> tf.Tensor:
+        """shape = [batch, max_label_length + 1]"""
+        _ = self._max_label_length_plus_one
         labels = tf.cond(
-            pred=tf.shape(self._original_label)[1] > self.max_label_length,
-            true_fn=lambda: self._original_label[:, :self.max_label_length_plus_one],
+            pred=tf.shape(self._original_label)[1] > self._max_label_length,
+            true_fn=lambda: self._original_label[:, : self._max_label_length_plus_one],
             false_fn=lambda: pad_until(
                 tensor=self._original_label,
-                desired_size=self.max_label_length_plus_one,
-                pad_value=self.pad_token_index,
-                axis=1
-            )
+                desired_size=self._max_label_length_plus_one,
+                pad_value=self._pad_token_index,
+                axis=1,
+            ),
         )
-        mask = tf.sequence_mask(lengths=self._original_label_length, maxlen=tf.shape(labels)[1])
-        blank_label = tf.ones_like(labels) * self.pad_token_index
+        mask = tf.sequence_mask(
+            lengths=self._original_label_length, maxlen=tf.shape(labels)[1]
+        )
+        blank_label = tf.ones_like(labels) * self._pad_token_index
         cleaned_label = tf.where(
             condition=mask,
             x=labels,
@@ -349,7 +417,7 @@ class BaseCtcLossData(ABC):
         )
         return cleaned_label
 
-    def select_from_act(self, act: tf.Tensor, label: tf.Tensor) -> tf.Tensor:
+    def _select_from_act(self, act: tf.Tensor, label: tf.Tensor) -> tf.Tensor:
         """Takes tensor of acts act_{b, a, t, u, ...} and labels label_{b,u},
         where b is the batch index, t is the logit index, and u is the label index,
         and returns for each token index k the tensor
@@ -369,89 +437,107 @@ class BaseCtcLossData(ABC):
         data = tf.squeeze(
             input=smart_reshape(
                 tensor=data,
-                shape=[1, self.batch_size * self.max_label_length_plus_one, self.max_logit_length]
+                shape=[
+                    1,
+                    self._batch_size * self._max_label_length_plus_one,
+                    self._max_logit_length,
+                ],
             ),
-            axis=0
+            axis=0,
         )
         # shape = [batch_size * (max_label_length + 1), max_logit_length, dim_a, ...]
 
-        segment_ids = tf.reshape(label + tf.expand_dims(tf.range(self.batch_size), 1) * self.num_tokens, shape=[-1])
+        segment_ids = tf.reshape(
+            label + tf.expand_dims(tf.range(self._batch_size), 1) * self._num_tokens,
+            shape=[-1],
+        )
         # shape = [batch_size * (max_label_length + 1)]
-        num_segments = self.batch_size * self.num_tokens
+        num_segments = self._batch_size * self._num_tokens
 
-        output = unsorted_segment_logsumexp(data=data, segment_ids=segment_ids, num_segments=num_segments)
+        output = unsorted_segment_logsumexp(
+            data=data, segment_ids=segment_ids, num_segments=num_segments
+        )
         # shape = [batch_size * num_tokens, max_logit_length, dim_a, ...]
-        output = smart_reshape(tf.expand_dims(output, 0), [self.batch_size, self.num_tokens, self.max_logit_length])
+        output = smart_reshape(
+            tf.expand_dims(output, 0),
+            [self._batch_size, self._num_tokens, self._max_logit_length],
+        )
         # shape = [batch_size, num_tokens, max_logit_length, dim_a, ...]
         output = smart_transpose(output, [0, 3, 2, 1])
         # shape = [batch_size, dim_a, max_logit_length, num_tokens, ...]
         return output
 
     @cached_property
-    def max_logit_length_plus_one(self) -> tf.Tensor:
-        return self.max_logit_length + tf.constant(1, dtype=tf.int32)
+    def _max_logit_length_plus_one(self) -> tf.Tensor:
+        return self._max_logit_length + tf.constant(1, dtype=tf.int32)
 
     @cached_property
-    def max_logit_length(self) -> tf.Tensor:
+    def _max_logit_length(self) -> tf.Tensor:
         return tf.shape(self._logprobas)[1]
 
     @cached_property
-    def max_label_length_plus_one(self) -> tf.Tensor:
-        return self.max_label_length + tf.constant(1, dtype=tf.int32)
+    def _max_label_length_plus_one(self) -> tf.Tensor:
+        return self._max_label_length + tf.constant(1, dtype=tf.int32)
 
     @cached_property
-    def max_label_length(self) -> tf.Tensor:
-        return reduce_max_with_default(self._original_label_length, default=tf.constant(0, dtype=tf.int32))
-
-    @cached_property
-    def pad_token_index(self) -> tf.Tensor:
-        return self.blank_token_index
-
-    @cached_property
-    def num_tokens(self) -> tf.Tensor:
-        return tf.shape(self._logprobas)[2]
-
-    @cached_property
-    def blank_token_index(self) -> tf.Tensor:
-        return self._blank_index
-
-    @cached_property
-    def logit_length_mask(self) -> tf.Tensor:
-        """ shape = [batch_size, max_logit_length] """
-        return tf.sequence_mask(
-            lengths=self._logit_length,
-            maxlen=self.max_logit_length,
+    def _max_label_length(self) -> tf.Tensor:
+        return reduce_max_with_default(
+            self._original_label_length, default=tf.constant(0, dtype=tf.int32)
         )
 
     @cached_property
-    def label_length_mask(self) -> tf.Tensor:
-        """ shape = [batch_size, max_label_length + 1], dtype = tf.bool """
-        return tf.sequence_mask(lengths=self.label_length, maxlen=self.max_label_length_plus_one)
+    def _pad_token_index(self) -> tf.Tensor:
+        return self._blank_token_index
+
+    @cached_property
+    def _num_tokens(self) -> tf.Tensor:
+        return tf.shape(self._logprobas)[2]
+
+    @cached_property
+    def _blank_token_index(self) -> tf.Tensor:
+        return self._blank_index
+
+    @cached_property
+    def _logit_length_mask(self) -> tf.Tensor:
+        """shape = [batch_size, max_logit_length]"""
+        return tf.sequence_mask(
+            lengths=self._logit_length,
+            maxlen=self._max_logit_length,
+        )
+
+    @cached_property
+    def _label_length_mask(self) -> tf.Tensor:
+        """shape = [batch_size, max_label_length + 1], dtype = tf.bool"""
+        return tf.sequence_mask(
+            lengths=self._label_length, maxlen=self._max_label_length_plus_one
+        )
 
     @property
-    def label_length(self) -> tf.Tensor:
+    def _label_length(self) -> tf.Tensor:
         return self._original_label_length
 
     @cached_property
-    def preceded_label(self) -> tf.Tensor:
+    def _preceded_label(self) -> tf.Tensor:
         """Preceded label. For example, for label "abc_" the sequence "_abc" is returned.
 
         Returns:    tf.Tensor, shape = [batch_size, max_label_length + 1]
         """
-        return tf.roll(self.label, shift=1, axis=1)
+        return tf.roll(self._label, shift=1, axis=1)
 
     @cached_property
-    def label(self) -> tf.Tensor:
-        """ shape = [batch, max_label_length + 1] """
-        return self.cleaned_label
+    def _label(self) -> tf.Tensor:
+        """shape = [batch, max_label_length + 1]"""
+        return self._cleaned_label
 
     @cached_property
-    def batch_size(self) -> tf.Tensor:
+    def _batch_size(self) -> tf.Tensor:
         return tf.shape(self._logprobas)[0]
 
     @abstractmethod
-    def combine_transition_probabilities(self, a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
+    def _combine_transition_probabilities(
+        self, a: tf.Tensor, b: tf.Tensor
+    ) -> tf.Tensor:
         """Given logarithmic probabilities a and b are merges like
-            a, b -> log( exp a exp p exp b )
+        a, b -> log( exp a exp p exp b )
         """
         raise NotImplementedError()

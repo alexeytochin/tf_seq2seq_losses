@@ -1,3 +1,6 @@
+"""Finite difference Jacobian approximation for batched functions."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import unittest
+
 from typing import Callable, Union
 import tensorflow as tf
 
 
-def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: tf.Tensor, epsilon: float) -> tf.Tensor:
-    """Calculate final difference jacobian approximation
+def finite_difference_batch_jacobian(
+    func: Callable[[tf.Tensor], tf.Tensor], x: tf.Tensor, epsilon: float
+) -> tf.Tensor:
+    """Calculate final difference Jacobian approximation
         gradient : x_bij -> gradient(x)_bij = (func(x + epsilon)_bij - func(x)_bij) / epsilon
     for given function
         func : x_bij -> y_bkl = func(x)_bkl.
@@ -36,7 +41,7 @@ def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: 
         func = lambda x: tf.reduce_sum(x**2, axis=[1,2]) / 2
         finite_difference_gradient(func=func, x=x, epsilon=epsilon)
         # -> tf.ones(shape=[2, 3, 4], dtype=tf.float32) # (approximately for epsilon -> 0)
-   ```
+    ```
 
     Args:
         func:       Callable:   tf.Tensor, shape = [batch_size] + DIMS_y,   dtype = tf.float32
@@ -48,19 +53,21 @@ def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: 
     Returns:        tf.Tensor, shape = [batch_size] + DIMS_x + DIMS_y
     """
     y0 = func(x)
-    DIMS_y = tf.shape(y0)[1:]
-    DIMS_x = tf.shape(x)[1:]
+    dims_y = tf.shape(y0)[1:]
+    dims_x = tf.shape(x)[1:]
     batch_size = tf.shape(x)[0]
     x_reshaped = tf.reshape(x, [batch_size, -1])
     # shape = [batch_size, dim_x]
 
     def func_(x_: tf.Tensor) -> tf.Tensor:
-        """Args:
+        """Argument for _finite_difference_batch_jacobian
+
+        Args:
             x_:     shape = [batch_size, dim_x]
 
         Returns:    shape = [batch_size, dim_y]
         """
-        x_orig = tf.reshape(x_, shape=tf.concat([[-1], DIMS_x], axis=0))
+        x_orig = tf.reshape(x_, shape=tf.concat([[-1], dims_x], axis=0))
         # shape = [batch_size] + DIM_x
         y_orig = func(x_orig)
         # shape = [batch_size] + DIM_y
@@ -68,17 +75,21 @@ def finite_difference_batch_jacobian(func: Callable[[tf.Tensor], tf.Tensor], x: 
         # shape = [batch_size, dim_y]
         return y_reshaped
 
-    dy_reshaped = _finite_difference_batch_jacobian(func=func_, x=x_reshaped, epsilon=epsilon)
-    # shape = [batch_size, dim_y, dims_x]
-    dy_shape = tf.concat([tf.expand_dims(batch_size, 0), DIMS_y, DIMS_x], axis=0)
+    dy_reshaped = _finite_difference_batch_jacobian(
+        func=func_, x=x_reshaped, epsilon=epsilon
+    )
+    # shape = [batch_size] + DIMS_y + DIMS_x
+    dy_shape = tf.concat([tf.expand_dims(batch_size, 0), dims_y, dims_x], axis=0)
     dy = tf.reshape(dy_reshaped, shape=dy_shape)
     # shape = [batch_size] + DIMS_y + DIMS_x
 
     return dy
 
 
-def _finite_difference_batch_jacobian(func, x, epsilon: Union[float, tf.Tensor]) -> tf.Tensor:
-    """
+def _finite_difference_batch_jacobian(
+    func, x, epsilon: Union[float, tf.Tensor]
+) -> tf.Tensor:
+    """Calculate final difference Jacobian approximation
 
     Args:
         func:   shape = [batch_size, dim_x] -> [batch_size, dim_y]
@@ -93,7 +104,9 @@ def _finite_difference_batch_jacobian(func, x, epsilon: Union[float, tf.Tensor])
     # shape = [dim_x, batch_size, dim_x]
     y0 = func(x)
     # shape = [batch_size, dim_y]
-    dy_transposed = (tf.vectorized_map(fn=func, elems=pre_x1) - tf.expand_dims(y0, 0)) / epsilon
+    dy_transposed = (
+        tf.vectorized_map(fn=func, elems=pre_x1) - tf.expand_dims(y0, 0)
+    ) / epsilon
     # shape = [dim_x, batch_size, dim_y]
     dy = tf.transpose(dy_transposed, perm=[1, 2, 0])
 

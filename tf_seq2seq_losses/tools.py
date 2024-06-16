@@ -1,3 +1,6 @@
+"""A set of auxiliary functions for numerical stability and tensor manipulations."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +26,7 @@ inf = tf.constant(np.inf)
 
 def logit_to_logproba(logit: tf.Tensor, axis: int) -> tf.Tensor:
     """Converts logits to logarithmic probabilities:
-        logit_to_logproba(x) = x - log (sum along axis (exp(x))
+        logit_to_logproba(x) = x - log (sum along axis (exp(x)))
 
     Args:
         logit:  tf.Tensor, dtype = tf.float32
@@ -31,8 +34,10 @@ def logit_to_logproba(logit: tf.Tensor, axis: int) -> tf.Tensor:
 
     Returns:    tf.Tensor, of the same shape and size as input logit
     """
-    log_probas = logit - tf.reduce_logsumexp(input_tensor=logit, axis=axis, keepdims=True)
-    return log_probas
+    logprobas = logit - tf.reduce_logsumexp(
+        input_tensor=logit, axis=axis, keepdims=True
+    )
+    return logprobas
 
 
 def apply_logarithmic_mask(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
@@ -42,7 +47,7 @@ def apply_logarithmic_mask(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
 
     Args:
         tensor: tf.Tensor, dtype = tf.float32 of the same shape as mask or broadcastable
-        mask:   tf.Tensor, dbool = tf.float32 of the same shape as tensor or broadcastable
+        mask:   tf.Tensor, dtype = tf.bool of the same shape as tensor or broadcastable
 
     Returns:    tf.Tensor, dtype = tf.float32 of the same shape as tensor
     """
@@ -62,11 +67,7 @@ def logsumexp(x: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
     return tf.where(
         condition=x < y,
         x=y + tf.math.softplus(x - y),
-        y=tf.where(
-            condition=x > y,
-            x=x + tf.math.softplus(y - x),
-            y=x + np.log(2.)
-        ),
+        y=tf.where(condition=x > y, x=x + tf.math.softplus(y - x), y=x + np.log(2.0)),
     )
 
 
@@ -91,8 +92,9 @@ def subexp(x: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
     )
 
 
-def unsorted_segment_logsumexp(data: tf.Tensor, segment_ids: tf.Tensor, num_segments: Union[int, tf.Tensor])\
-        -> tf.Tensor:
+def unsorted_segment_logsumexp(
+    data: tf.Tensor, segment_ids: tf.Tensor, num_segments: Union[int, tf.Tensor]
+) -> tf.Tensor:
     """Computes the logarithmic sum of exponents along segments of a tensor
     like other operators from tf.math.unsorted_segment_* family.
 
@@ -103,21 +105,25 @@ def unsorted_segment_logsumexp(data: tf.Tensor, segment_ids: tf.Tensor, num_segm
 
     Returns:            tf.Tensor,  shape = [num_segments] + data_dims, for the same type as data
     """
-    data_max = tf.math.unsorted_segment_max(data=data, segment_ids=segment_ids, num_segments=num_segments)
+    data_max = tf.math.unsorted_segment_max(
+        data=data, segment_ids=segment_ids, num_segments=num_segments
+    )
     data_normed = data - tf.gather(params=data_max, indices=segment_ids)
-    output = data_max + tf.math.log(tf.math.unsorted_segment_sum(
-        data=tf.exp(data_normed),
-        segment_ids=segment_ids,
-        num_segments=num_segments,
-    ))
+    output = data_max + tf.math.log(
+        tf.math.unsorted_segment_sum(
+            data=tf.exp(data_normed),
+            segment_ids=segment_ids,
+            num_segments=num_segments,
+        )
+    )
     return output
 
 
 def pad_until(
-        tensor: tf.Tensor,
-        desired_size: Union[tf.Tensor, int],
-        axis: int,
-        pad_value: Union[tf.Tensor, int, float, bool] = 0
+    tensor: tf.Tensor,
+    desired_size: Union[tf.Tensor, int],
+    axis: int,
+    pad_value: Union[tf.Tensor, int, float, bool] = 0,
 ) -> tf.Tensor:
     """Pads tensor until desired dimension from right,
 
@@ -134,7 +140,11 @@ def pad_until(
         raise ValueError()
 
     current_size = tf.shape(tensor)[axis]
-    paddings = [[0, 0]] * axis + [[0, desired_size - current_size]] + [[0, 0]] * (rank - axis - 1)
+    paddings = (
+        [[0, 0]] * axis
+        + [[0, desired_size - current_size]]
+        + [[0, 0]] * (rank - axis - 1)
+    )
     return tf.pad(tensor=tensor, paddings=paddings, constant_values=pad_value)
 
 
@@ -152,8 +162,8 @@ def insert_zeros(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
     ```
 
     Args:
-        tensor: tf.Tensor, shape = [batch, length], any type and the same shape as mask
-        mask:   tf.Tensor, shape = [batch, length], dtype = tf.bool and the same shape as tensor
+        tensor: tf.Tensor, shape = [batch, length], any type and the same shape as mask.
+        mask:   tf.Tensor, shape = [batch, length], dtype = tf.bool and the same shape as tensor.
 
     Returns:    tf.Tensor, shape = [batch, length + max_num_insertions],
                 where max_num_insertions is the maximal number of True values along the 0 batch dimension of mask.
@@ -172,20 +182,20 @@ def insert_zeros(tensor: tf.Tensor, mask: tf.Tensor) -> tf.Tensor:
     output = tf.scatter_nd(
         indices=indices,
         updates=tf.reshape(tensor, shape=[-1]),
-        shape=tf.stack([batch_size, length + max_num_insertions])
+        shape=tf.stack([batch_size, length + max_num_insertions]),
     )
 
     return output
 
 
 def unfold(
-        init_tensor: tf.Tensor,
-        iterfunc: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
-        num_iters: Union[int, tf.Tensor],
-        d_i: int,
-        element_shape: tf.TensorShape,
-        swap_memory: bool = False,
-        name: str = "unfold",
+    init_tensor: tf.Tensor,
+    iterfunc: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+    num_iters: Union[int, tf.Tensor],
+    d_i: int,
+    element_shape: tf.TensorShape,
+    swap_memory: bool = False,
+    name: str = "unfold",
 ) -> tf.Tensor:
     """Calculates a tensor by iterations over i that is the concatenation
         for d_i = +1:
@@ -222,7 +232,7 @@ def unfold(
         d_i:            either +1 or -1, where
                             +1 corresponds for the iterations from 0 to num_iters inclusive
                             -1 corresponds for the iterations from num_iters to 0 inclusive
-        element_shape:  tf.TensorShape([]) that is the shape of init_tensor
+        element_shape:  shape of init_tensor
         swap_memory:    the same as for tf.while_loop, argument
         name:           str, local tensor names scope
 
@@ -243,12 +253,16 @@ def unfold(
             infer_shape=True,
             dynamic_size=False,
         )
-        tensor_array = tensor_array.write(0 if positive_direction else num_iters, init_tensor)
+        tensor_array = tensor_array.write(
+            0 if positive_direction else num_iters, init_tensor
+        )
 
         def body(i, tensor_slice):
             last_value = tensor_slice.read(i if positive_direction else i + 1)
             new_value = iterfunc(last_value, i)
-            tensor_slice = tensor_slice.write(i + 1 if positive_direction else i, new_value)
+            tensor_slice = tensor_slice.write(
+                i + 1 if positive_direction else i, new_value
+            )
             return i + d_i, tensor_slice
 
         n = tf.constant(0, dtype=tf.int32) if positive_direction else num_iters - 1
@@ -258,7 +272,7 @@ def unfold(
             loop_vars=(n, tensor_array),
             maximum_iterations=num_iters,
             swap_memory=swap_memory,
-            name=f"unfold_while_loop",
+            name="unfold_while_loop",
         )
         return array_out.stack()
 
@@ -274,14 +288,10 @@ def reduce_max_with_default(input_tensor: tf.Tensor, default: tf.Tensor) -> tf.T
     Returns:            tf.Tensor, shape = [], dtype the same as input_tensor
     """
     total_size = tf.shape(tf.reshape(input_tensor, [-1]))[0]
-    return tf.where(
-        condition=total_size > 0,
-        x=tf.reduce_max(input_tensor),
-        y=default
-    )
+    return tf.where(condition=total_size > 0, x=tf.reduce_max(input_tensor), y=default)
 
 
-def expand_many_dims(input: tf.Tensor, axes: List[int]) -> tf.Tensor:
+def expand_many_dims(x: tf.Tensor, axes: List[int]) -> tf.Tensor:
     """Analogous of tf.expand_dims for multiple new dimensions.
     Like for tf.expand_dims no new memory allocated for the output tensor.
 
@@ -290,21 +300,21 @@ def expand_many_dims(input: tf.Tensor, axes: List[int]) -> tf.Tensor:
         # -> [1, 5, 1, 3, 1, 1]
 
     Args:
-        input:  tf.Tensor of any rank shape and type
+        x:  tf.Tensor of any rank shape and type
         axes:   list of integer that are supposed to be the indexes of new dimensions.
 
     Returns:    tf.Tensor of the same type an input and rank = rank(input) + len(axes)
     """
-    tensor = input
+    tensor = x
     for axis in axes:
         tensor = tf.expand_dims(input=tensor, axis=axis)
 
     return tensor
 
 
-def smart_transpose(a: tf.Tensor, perm=List[int]) -> tf.Tensor:
+def smart_transpose(a: tf.Tensor, perm: List[int]) -> tf.Tensor:
     """Extension of tf.transpose.
-    Parameter perm may be shorter list than rank on input tensor a.
+    Parameter perm may be shorter list than rank on input tensor `a`.
     This case all dimensions that are beyond the list perm remain unchanged.
 
     For example:
@@ -313,26 +323,29 @@ def smart_transpose(a: tf.Tensor, perm=List[int]) -> tf.Tensor:
 
     Args:
         a:      tf.Tensor of any rank shape and type
-        perm:   list of integers like for tf.transpose but in may be shorter than the shape of a.
+        perm:   list of integers like for `tf.transpose` but in may be shorter than the shape of `a`.
 
-    Returns:    tf.Tensor of the same type and rank as th input tensor a.
+    Returns:    tf.Tensor of the same type and rank as th input tensor `a`.
     """
     if len(perm) > len(a.shape):
-        raise ValueError(f"Tensor with shape '{a.shape}' cannot be reshaped to '{perm}'")
-    else:
-        perm_rest = list(range(len(perm), len(a.shape)))
+        raise ValueError(
+            f"Tensor with shape '{a.shape}' cannot be reshaped to '{perm}'"
+        )
+    perm_rest = list(range(len(perm), len(a.shape)))
 
     return tf.transpose(a=a, perm=perm + perm_rest)
 
 
-def smart_reshape(tensor: tf.Tensor, shape: List[Optional[Union[int, tf.Tensor]]]) -> tf.Tensor:
+def smart_reshape(
+    tensor: tf.Tensor, shape: List[Optional[Union[int, tf.Tensor]]]
+) -> tf.Tensor:
     """A version of tf.reshape.
-    1. The ouput tensor is always of the same rank as input tensor.
+    1. The output tensor is always of the same rank as input tensor.
     2. The parameter shape is supposed to be a list that is smaller or equal
     than the tensor shape.
     3. The list shape may contain None, that means "keep this dimension unchanged".
     4. The list shape is appended with None value to be of the same length as the input tensor shape.
-    5. Like for tf.reshape output tensor does not requre new memory for allocation.
+    5. Like for `tf.reshape` output tensor does not requre new memory for allocation.
 
     For example:
     ```python
@@ -350,9 +363,10 @@ def smart_reshape(tensor: tf.Tensor, shape: List[Optional[Union[int, tf.Tensor]]
     Returns:    tf.Tensor of the same typey and rank as the input tensor
     """
     if len(shape) > len(tensor.shape):
-        raise ValueError(f"Tensor with shape {tensor.shape} cannot be reshaped to {shape}.")
-    else:
-        shape = shape + [None] * (len(tensor.shape) - len(shape))
+        raise ValueError(
+            f"Tensor with shape {tensor.shape} cannot be reshaped to {shape}."
+        )
+    shape = shape + [None] * (len(tensor.shape) - len(shape))
 
     original_shape = tf.shape(tensor)
     new_shape = []

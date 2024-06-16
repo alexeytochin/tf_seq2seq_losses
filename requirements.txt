@@ -1,6 +1,5 @@
 tensorflow>=2.6.1
 numpy
-cached_property
 tqdm
 tabulate
 pandas

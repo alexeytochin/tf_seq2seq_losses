@@ -1,3 +1,6 @@
+"""Common functions for tests."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +16,30 @@
 # limitations under the License.
 # ==============================================================================
 
-import tensorflow as tf
 from typing import Optional, Dict, Union
+import tensorflow as tf
 
 from tf_seq2seq_losses.tools import logit_to_logproba
 
 
 def tf_ctc_loss(
-        labels: tf.Tensor,
-        logits: tf.Tensor,
-        label_length: tf.Tensor,
-        logit_length: tf.Tensor,
-        blank_index: Union[int, tf.Tensor]=0,
+    labels: tf.Tensor,
+    logits: tf.Tensor,
+    label_length: tf.Tensor,
+    logit_length: tf.Tensor,
+    blank_index: Union[int, tf.Tensor] = 0,
 ):
+    """Wrapper for tf.nn.ctc_loss
+
+    Args:
+        labels:         labels,         shape = [batch_size, max_label_length]
+        logits:         logits,         shape = [batch_size, max_logit_length, num_tokens]
+        label_length:   label length,   shape = [batch_size]
+        logit_length:   logit length,   shape = [batch_size]
+        blank_index:    blank index,    shape = []
+
+    Returns:            loss value,     shape = [batch_size]
+    """
     return tf.nn.ctc_loss(
         labels=labels,
         logits=logits,
@@ -37,11 +51,11 @@ def tf_ctc_loss(
 
 
 def generate_ctc_loss_inputs(
-        batch_size: int,
-        max_logit_length: int,
-        random_seed: Optional[int],
-        num_tokens: int,
-        blank_index: int,
+    batch_size: int,
+    max_logit_length: int,
+    random_seed: Optional[int],
+    num_tokens: int,
+    blank_index: int,
 ) -> Dict[str, Union[tf.Tensor, int]]:
     """Generates random data for ctc-loss
 
@@ -57,20 +71,27 @@ def generate_ctc_loss_inputs(
     assert blank_index == 0
     if random_seed is not None:
         tf.random.set_seed(random_seed)
-    logits = tf.random.normal(shape=[batch_size, max_logit_length, num_tokens], stddev=1)
+    logits = tf.random.normal(
+        shape=[batch_size, max_logit_length, num_tokens], stddev=1
+    )
     logit_length = tf.random.uniform(
         minval=max_logit_length // 2,
         maxval=max_logit_length,
         shape=[batch_size],
-        dtype=tf.int32
+        dtype=tf.int32,
     )
     label_length = tf.random.uniform(
         minval=max_logit_length // 4,
         maxval=max_logit_length // 2,
         shape=[batch_size],
-        dtype=tf.int32
+        dtype=tf.int32,
     )
-    labels = tf.random.uniform(minval=1, maxval=num_tokens, shape=[batch_size, max_logit_length], dtype=tf.int32)
+    labels = tf.random.uniform(
+        minval=1,
+        maxval=num_tokens,
+        shape=[batch_size, max_logit_length],
+        dtype=tf.int32,
+    )
     log_probas = logit_to_logproba(logit=logits, axis=2)
 
     return {
@@ -79,5 +100,5 @@ def generate_ctc_loss_inputs(
         "logprobas": log_probas,
         "label_length": label_length,
         "logit_length": logit_length,
-        "blank_index": blank_index
+        "blank_index": blank_index,
     }
