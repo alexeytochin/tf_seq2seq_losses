@@ -25,8 +25,7 @@ jobs:
       - name: Analysing the code with ruff
         run: ruff check .
       - name: Test with unittest
-        run: |
-          python -m unittest
+        run: python -m unittest
   Test-Python-3-11-0rc1-TF-2-16-1:
     runs-on: ubuntu-latest
     container: tensorflow/tensorflow:2.16.1
@@ -45,5 +44,4 @@ jobs:
       - name: Analysing the code with ruff
         run: ruff check .
       - name: Test with unittest
-        run: |
-          python -m unittest
+        run: python -m unittest
