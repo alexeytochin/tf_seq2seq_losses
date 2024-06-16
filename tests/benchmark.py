@@ -30,8 +30,6 @@ from tests.common import generate_ctc_loss_inputs, tf_ctc_loss
 from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
 
-Function = tf.types.experimental.PolymorphicFunction
-
 
 class TestBenchmarkCtcLosses(unittest.TestCase):
     """Benchmark for CTC losses implementations."""
@@ -60,23 +58,23 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         """Test all gradient benchmarks."""
         logging.info("Loss gradient benchmark:")
 
-        perfomance_test_results = pd.DataFrame(
+        performance_test_results = pd.DataFrame(
             columns=["mean processing time (s)", "std"]
         )
-        perfomance_test_results.index.name = "implementation"
-        perfomance_test_results.loc["tensorflow.nn.ctc_loss"] = (
+        performance_test_results.index.name = "implementation"
+        performance_test_results.loc["tensorflow.nn.ctc_loss"] = (
             self.benchmark_tf_ctc_loss_gradient()
         )
-        perfomance_test_results.loc["classic_ctc_loss"] = (
+        performance_test_results.loc["classic_ctc_loss"] = (
             self.benchmark_classic_ctc_loss_gradient()
         )
-        perfomance_test_results.loc["simple_ctc_loss"] = (
+        performance_test_results.loc["simple_ctc_loss"] = (
             self.benchmark_simple_ctc_loss_gradient()
         )
 
         result_table = tabulate(
-            perfomance_test_results,
-            headers=perfomance_test_results.columns,
+            performance_test_results,
+            headers=performance_test_results.columns,
             tablefmt="grid",
             floatfmt=("", ".3g", ".1g"),
         )
@@ -163,7 +161,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def _forward_graph(
-        self, loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], Function]
+        self, loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], Any]
     ):
         """Create a graph for the forward calculation."""
 
@@ -182,7 +180,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
 
     def _gradient_graph(
         self, loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor]
-    ) -> Function:
+    ) -> Any:
         """Create a graph for the gradient calculation."""
 
         @tf.function(

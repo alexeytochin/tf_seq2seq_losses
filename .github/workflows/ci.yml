@@ -17,7 +17,8 @@ jobs:
 #        run: |
 #          apt-get update
 #          apt-get install -y git
-      - run: python -V
+      - name: Show python version
+        run: python -V
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
