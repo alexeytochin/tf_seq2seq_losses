@@ -1,3 +1,6 @@
+"""Tests for CTC losses."""
+
+# ==============================================================================
 # Copyright 2022 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +20,9 @@ import tensorflow as tf
 
 from tests.common import generate_ctc_loss_inputs
 from tests.test_ctc_losses import TestCtcLoss
+from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses import classic_ctc_loss
 from tf_seq2seq_losses.base_loss import ctc_loss_from_logproba
-from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.simplified_ctc_loss import (
     SimplifiedCtcLossData,
     simplified_ctc_loss,
@@ -28,7 +31,10 @@ from tf_seq2seq_losses.tools import logit_to_logproba
 
 
 class TestSimplifiedCtcLoss(TestCtcLoss):
+    """Tests for the simplified CTC loss."""
+
     def test_single_logit_case(self):
+        """Test for the case with a single logit."""
         logits = tf.math.log(tf.constant([[[1 / 3, 1 / 3, 1 / 3]]], dtype=tf.float32))
         labels = tf.constant([[1]], dtype=tf.int32)
         length_label = tf.constant([1], dtype=tf.int32)
@@ -44,15 +50,16 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
             blank_index=blank_index,
         )
 
-        self.assertTensorsAlmostEqual(
+        self.assert_tensors_almost_equal(
             first=tf.constant([[[0.0, -1.0, 0.0]]]), second=loss_data.gradient, places=6
         )
 
-        self.assertTensorsAlmostEqual(
+        self.assert_tensors_almost_equal(
             tf.zeros(shape=[1, 1, 3, 1, 3]), loss_data.hessian, places=6
         )
 
     def test_simple_case(self):
+        """Test for the simple case."""
         logit = tf.math.log(
             tf.constant(
                 [[[0, 1, 0], [1, 0, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0]]],
@@ -74,11 +81,12 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
             blank_index=blank_index,
         )
 
-        self.assertTensorsAlmostEqual(
+        self.assert_tensors_almost_equal(
             tf.exp(loss_session.alpha), tf.exp(loss_session.gamma[:, 0, 0]), places=None
         )
 
     def test_gamma_symmetry(self):
+        """Test for the symmetry of the gamma tensor."""
         input_dict = generate_ctc_loss_inputs(
             max_logit_length=4, batch_size=1, random_seed=0, num_tokens=3, blank_index=0
         )
@@ -92,13 +100,14 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         )
         transposed_hessian = tf.transpose(loss_session.hessian, perm=[0, 3, 4, 1, 2])
 
-        self.assertTensorsAlmostEqual(
+        self.assert_tensors_almost_equal(
             first=tf.exp(transposed_hessian),
             second=tf.exp(loss_session.hessian),
             places=6,
         )
 
     def test_second_derivative_shape(self):
+        """Test for the shape of the second derivative."""
         batch_size = 2
         num_tokens = 3
         max_logit_length = 4
@@ -137,6 +146,7 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         )
 
     def test_hessian_vs_finite_difference(self):
+        """A test for the second derivative of the loss."""
         input_dict = generate_ctc_loss_inputs(
             max_logit_length=4, batch_size=2, random_seed=0, num_tokens=2, blank_index=0
         )
@@ -155,13 +165,13 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
                     )
                 )
             gradient = tape.gradient(loss, sources=logits)
-            # shape = [batch_size, logit_length, num_tokens]
+            # shape: [batch_size, logit_length, num_tokens]
             return gradient
 
         hessain_numerical = finite_difference_batch_jacobian(
             func=gradient_fn, x=logits, epsilon=1e-4
         )
-        # shape = [batch_size, logit_length, num_tokens, logit_length, num_tokens]
+        # shape: [batch_size, logit_length, num_tokens, logit_length, num_tokens]
 
         with tf.GradientTape() as tape:
             tape.watch([logits])
@@ -169,9 +179,10 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
 
         hessain_analytic = tape.batch_jacobian(gradient, source=logits)
 
-        self.assertTensorsAlmostEqual(hessain_numerical, hessain_analytic, 2)
+        self.assert_tensors_almost_equal(hessain_numerical, hessain_analytic, 2)
 
     def test_readme_example(self):
+        """Test for the example from the README."""
         batch_size = 2
         num_token = 3  # = 2 tokens + blank
         logit_length = 5
@@ -196,13 +207,12 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
                     )
                 )
             gradient = tape2.gradient(loss, sources=logits)
-        hessian = tape1.batch_jacobian(
-            gradient, source=logits, experimental_use_pfor=False
-        )
+        _ = tape1.batch_jacobian(gradient, source=logits, experimental_use_pfor=False)
         # experimental_use_pfor=False is needed to avoid a bag in tf.batch_jacobian and tf.jacobian
         # occurred in TensorFlow Version 2.4.1
 
     def test_second_gradient_autograph(self):
+        """Test for the second derivative of the loss in autograph mode."""
         batch_size = 2
         num_tokens = 3
         max_logit_length = 4

@@ -130,7 +130,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         gamma_forward = tf.transpose(gamma_forward_transposed, [1, 2, 3, 0, 4])
         # shape = [batch_size, max_logit_length + 1, max_label_length + 1, max_logit_length + 1, max_label_length + 1]
         mask = expand_many_dims(
-            input=tf.linalg.band_part(
+            x=tf.linalg.band_part(
                 tf.ones(shape=[self._max_logit_length_plus_one] * 2, dtype=tf.bool),
                 0,
                 -1,
@@ -431,7 +431,7 @@ class SimplifiedCtcLossData(BaseCtcLossData):
         Returns: shape: [batch_size, max_label_length + 1]
         """
         alpha_0 = tf.math.log(
-            tf.one_hot(indices=0, depth=(self._max_label_length_plus_one))
+            tf.one_hot(indices=0, depth=self._max_label_length_plus_one)
         )
         alpha_0 = tf.tile(
             input=tf.expand_dims(alpha_0, 0), multiples=[self._batch_size, 1]

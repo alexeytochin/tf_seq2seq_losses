@@ -1,3 +1,6 @@
+"""Setup script for the package."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +16,8 @@
 # limitations under the License.
 # ==============================================================================
 
-from setuptools import setup
 import pathlib
+from setuptools import setup
 
 here = pathlib.Path(__file__).parent.resolve()
 
@@ -40,8 +43,8 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     keywords="tensorflow, loss, loss function, ctc, connectionist temporal classification, "
     "seq2se, seq 2 seq, seq to seq, asr, automatic speach recognition, sequence recognition"

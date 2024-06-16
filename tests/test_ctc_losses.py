@@ -1,3 +1,6 @@
+"""Tests for the classic CTC loss."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,16 +20,23 @@ import unittest
 from typing import Optional
 import numpy as np
 import tensorflow as tf
-import os
-
-
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TestCtcLoss(unittest.TestCase):
-    def assertTensorsAlmostEqual(
+    """Base class for loss tests."""
+
+    def assert_tensors_almost_equal(
         self, first: tf.Tensor, second: tf.Tensor, places: Optional[int]
     ):
+        """Asserts that two tensorflow tensors are almost equal (against L infinity norm).
+
+        Args:
+            first:  first instance to compare
+            second: second instance to compare
+            places: number of decimal places to compare
+
+        Returns:    None
+        """
         if places is None:
             self.assertTrue(tf.reduce_all(first == second).numpy())
         else:

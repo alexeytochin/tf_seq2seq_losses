@@ -17,8 +17,8 @@
 # ==============================================================================
 
 from typing import Union
-import numpy as np
 from functools import cached_property
+import numpy as np
 import tensorflow as tf
 
 from tf_seq2seq_losses.base_loss import BaseCtcLossData, ctc_loss
@@ -202,7 +202,7 @@ class ClassicCtcLossData(BaseCtcLossData):
         #   max_logit_length + 1, max_label_length + 1, state]
 
         mask = expand_many_dims(
-            input=tf.linalg.band_part(
+            x=tf.linalg.band_part(
                 tf.ones(shape=[self._max_logit_length_plus_one] * 2, dtype=tf.bool),
                 0,
                 -1,
@@ -330,7 +330,10 @@ class ClassicCtcLossData(BaseCtcLossData):
                     dtype = tf.float32
         """
         # This is to avoid InaccessibleTensorError in graph mode
-        _, _ = self._horizontal_step_log_proba, self._any_to_open_diagonal_step_log_proba
+        _, _ = (
+            self._horizontal_step_log_proba,
+            self._any_to_open_diagonal_step_log_proba,
+        )
 
         beta = unfold(
             init_tensor=self.last_beta_slice,
@@ -393,7 +396,10 @@ class ClassicCtcLossData(BaseCtcLossData):
                     dtype = tf.float32
         """
         # This is to avoid InaccessibleTensorError in graph mode
-        _, _ = self._horizontal_step_log_proba, self._any_to_open_diagonal_step_log_proba
+        _, _ = (
+            self._horizontal_step_log_proba,
+            self._any_to_open_diagonal_step_log_proba,
+        )
 
         alpha = unfold(
             init_tensor=self._first_alpha_slice,
@@ -562,10 +568,10 @@ class ClassicCtcLossData(BaseCtcLossData):
         """Transforms logarithmic transition probabilities a and b.
 
         Args:
-            a:      shape = [batch, DIMS_A, max_logit_length, max_label_length + 1, state]
-            b:      shape = [batch, max_logit_length, max_label_length + 1, state, DIMS_B]
+            a:      shape: [batch, DIMS_A, max_logit_length, max_label_length + 1, state]
+            b:      shape: [batch, max_logit_length, max_label_length + 1, state, DIMS_B]
 
-        Returns:    shape = [batch, DIMS_A, max_logit_length, num_tokens, DIMS_B]
+        Returns:    shape: [batch, DIMS_A, max_logit_length, num_tokens, DIMS_B]
         """
         assert len(a.shape) >= 4
         assert len(b.shape) >= 4

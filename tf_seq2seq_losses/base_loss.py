@@ -19,8 +19,8 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Union, Type
-import tensorflow as tf
 from functools import cached_property
+import tensorflow as tf
 
 from tf_seq2seq_losses.tools import (
     logit_to_logproba,
@@ -221,7 +221,7 @@ class BaseCtcLossData(ABC):
         )
 
         mask = expand_many_dims(
-            input=tf.linalg.band_part(
+            x=tf.linalg.band_part(
                 tf.ones(shape=[self._max_logit_length] * 2, dtype=tf.bool), 0, -1
             ),
             axes=[0, 2, 4],

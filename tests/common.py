@@ -1,3 +1,6 @@
+"""Common functions for tests."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +16,8 @@
 # limitations under the License.
 # ==============================================================================
 
-import tensorflow as tf
 from typing import Optional, Dict, Union
+import tensorflow as tf
 
 from tf_seq2seq_losses.tools import logit_to_logproba
 
@@ -26,6 +29,17 @@ def tf_ctc_loss(
     logit_length: tf.Tensor,
     blank_index: Union[int, tf.Tensor] = 0,
 ):
+    """Wrapper for tf.nn.ctc_loss
+
+    Args:
+        labels:         labels,         shape: [batch_size, max_label_length]
+        logits:         logits,         shape: [batch_size, max_logit_length, num_tokens]
+        label_length:   label length,   shape: [batch_size]
+        logit_length:   logit length,   shape: [batch_size]
+        blank_index:    blank index,    shape: []
+
+    Returns:            loss value,     shape: [batch_size]
+    """
     return tf.nn.ctc_loss(
         labels=labels,
         logits=logits,

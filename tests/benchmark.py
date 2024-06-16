@@ -1,3 +1,6 @@
+"""Benchmark for CTC losses implementations."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,23 +17,27 @@
 # ==============================================================================
 
 import unittest
+import logging
 from datetime import datetime
 from typing import Any, Callable, Dict
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.python.eager.function import Function
 from tqdm import tqdm
-import logging
 from tabulate import tabulate
 
 from tests.common import generate_ctc_loss_inputs, tf_ctc_loss
 from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
 
+Function = tf.types.experimental.PolymorphicFunction
+
 
 class TestBenchmarkCtcLosses(unittest.TestCase):
+    """Benchmark for CTC losses implementations."""
+
     def setUp(self) -> None:
+        """Set up the test environment."""
         logging.getLogger().setLevel(logging.INFO)
         self.batch_size = 256
         self.num_tokens = 32
@@ -50,6 +57,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         self.logit_length = input_dict["logit_length"]
 
     def test_all_gradients_benchmark(self) -> None:
+        """Test all gradient benchmarks."""
         logging.info("Loss gradient benchmark:")
 
         perfomance_test_results = pd.DataFrame(
@@ -66,17 +74,16 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
             self.benchmark_simple_ctc_loss_gradient()
         )
 
-        logging.info(
-            "\n"
-            + tabulate(
-                perfomance_test_results,
-                headers=perfomance_test_results.columns,
-                tablefmt="grid",
-                floatfmt=("", ".3g", ".1g"),
-            )
+        result_table = tabulate(
+            perfomance_test_results,
+            headers=perfomance_test_results.columns,
+            tablefmt="grid",
+            floatfmt=("", ".3g", ".1g"),
         )
+        logging.info(f"{result_table}")
 
     def test_all_forwards_benchmarks(self) -> None:
+        """Test all forward benchmarks."""
         logging.info("Loss forward benchmark:")
 
         perfomance_test_results = pd.DataFrame(
@@ -93,17 +100,16 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
             self.benchmark_simplified_ctc_loss_forward()
         )
 
-        logging.info(
-            "\n"
-            + tabulate(
-                perfomance_test_results,
-                headers=perfomance_test_results.columns,
-                tablefmt="grid",
-                floatfmt=("", ".3g", ".1g"),
-            )
+        result_table = tabulate(
+            perfomance_test_results,
+            headers=perfomance_test_results.columns,
+            tablefmt="grid",
+            floatfmt=("", ".3g", ".1g"),
         )
+        logging.info(f"\n{result_table}")
 
     def benchmark_tf_ctc_loss_gradient(self) -> Dict[str, Any]:
+        """Benchmark TensorFlow CTC loss gradient."""
         return self.evaluate(
             func=self._gradient_graph(loss_fn=tf_ctc_loss),
             num_total_steps=10,
@@ -112,6 +118,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def benchmark_classic_ctc_loss_gradient(self) -> Dict[str, Any]:
+        """Benchmark classic CTC loss gradient."""
         return self.evaluate(
             func=self._gradient_graph(loss_fn=classic_ctc_loss),
             num_total_steps=10,
@@ -120,6 +127,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def benchmark_simple_ctc_loss_gradient(self) -> Dict[str, Any]:
+        """Benchmark simplified CTC loss gradient."""
         return self.evaluate(
             func=self._gradient_graph(loss_fn=simplified_ctc_loss),
             num_total_steps=10,
@@ -128,6 +136,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def benchmark_tf_ctc_loss_forward(self) -> Dict[str, Any]:
+        """Benchmark TensorFlow CTC loss forward."""
         return self.evaluate(
             func=tf.function(tf_ctc_loss),
             num_total_steps=10,
@@ -136,6 +145,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def benchmark_classic_ctc_loss_forward(self) -> Dict[str, Any]:
+        """Benchmark classic CTC loss forward."""
         return self.evaluate(
             func=tf.function(classic_ctc_loss),
             num_total_steps=10,
@@ -144,6 +154,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
         )
 
     def benchmark_simplified_ctc_loss_forward(self) -> Dict[str, Any]:
+        """Benchmark simplified CTC loss forward."""
         return self.evaluate(
             func=tf.function(simplified_ctc_loss),
             num_total_steps=10,
@@ -154,6 +165,8 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
     def _forward_graph(
         self, loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], Function]
     ):
+        """Create a graph for the forward calculation."""
+
         @tf.function(
             input_signature=[
                 tf.TensorSpec(shape=[None, None], dtype=tf.int32),
@@ -170,6 +183,8 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
     def _gradient_graph(
         self, loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor]
     ) -> Function:
+        """Create a graph for the gradient calculation."""
+
         @tf.function(
             input_signature=[
                 tf.TensorSpec(shape=[None, None], dtype=tf.int32),
@@ -191,6 +206,7 @@ class TestBenchmarkCtcLosses(unittest.TestCase):
     def evaluate(
         self, func: Callable, num_total_steps: int, num_warm_up_steps: int, name: str
     ) -> Dict[str, Any]:
+        """Evaluate the function."""
         for _ in tqdm(
             range(num_warm_up_steps),
             desc=f"{name}: warming up",

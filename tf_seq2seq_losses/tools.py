@@ -1,3 +1,6 @@
+"""A set of auxiliary functions for numerical stability and tensor manipulations."""
+
+# ==============================================================================
 # Copyright 2021 Alexey Tochin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -269,7 +272,7 @@ def unfold(
             loop_vars=(n, tensor_array),
             maximum_iterations=num_iters,
             swap_memory=swap_memory,
-            name=f"unfold_while_loop",
+            name="unfold_while_loop",
         )
         return array_out.stack()
 
@@ -288,7 +291,7 @@ def reduce_max_with_default(input_tensor: tf.Tensor, default: tf.Tensor) -> tf.T
     return tf.where(condition=total_size > 0, x=tf.reduce_max(input_tensor), y=default)
 
 
-def expand_many_dims(input: tf.Tensor, axes: List[int]) -> tf.Tensor:
+def expand_many_dims(x: tf.Tensor, axes: List[int]) -> tf.Tensor:
     """Analogous of tf.expand_dims for multiple new dimensions.
     Like for tf.expand_dims no new memory allocated for the output tensor.
 
@@ -297,19 +300,19 @@ def expand_many_dims(input: tf.Tensor, axes: List[int]) -> tf.Tensor:
         # -> [1, 5, 1, 3, 1, 1]
 
     Args:
-        input:  tf.Tensor of any rank shape and type
+        x:  tf.Tensor of any rank shape and type
         axes:   list of integer that are supposed to be the indexes of new dimensions.
 
     Returns:    tf.Tensor of the same type an input and rank = rank(input) + len(axes)
     """
-    tensor = input
+    tensor = x
     for axis in axes:
         tensor = tf.expand_dims(input=tensor, axis=axis)
 
     return tensor
 
 
-def smart_transpose(a: tf.Tensor, perm=List[int]) -> tf.Tensor:
+def smart_transpose(a: tf.Tensor, perm: List[int]) -> tf.Tensor:
     """Extension of tf.transpose.
     Parameter perm may be shorter list than rank on input tensor a.
     This case all dimensions that are beyond the list perm remain unchanged.
@@ -328,8 +331,7 @@ def smart_transpose(a: tf.Tensor, perm=List[int]) -> tf.Tensor:
         raise ValueError(
             f"Tensor with shape '{a.shape}' cannot be reshaped to '{perm}'"
         )
-    else:
-        perm_rest = list(range(len(perm), len(a.shape)))
+    perm_rest = list(range(len(perm), len(a.shape)))
 
     return tf.transpose(a=a, perm=perm + perm_rest)
 
@@ -364,8 +366,7 @@ def smart_reshape(
         raise ValueError(
             f"Tensor with shape {tensor.shape} cannot be reshaped to {shape}."
         )
-    else:
-        shape = shape + [None] * (len(tensor.shape) - len(shape))
+    shape = shape + [None] * (len(tensor.shape) - len(shape))
 
     original_shape = tf.shape(tensor)
     new_shape = []
