@@ -89,7 +89,7 @@ def finite_difference_batch_jacobian(
 def _finite_difference_batch_jacobian(
     func, x, epsilon: Union[float, tf.Tensor]
 ) -> tf.Tensor:
-    """Calculate final difference Jacobian approximation
+    """Calculate finite difference Jacobian approximation
 
     Args:
         func:   shape = [batch_size, dim_x] -> [batch_size, dim_y]
@@ -104,9 +104,8 @@ def _finite_difference_batch_jacobian(
     # shape = [dim_x, batch_size, dim_x]
     y0 = func(x)
     # shape = [batch_size, dim_y]
-    dy_transposed = (
-        tf.vectorized_map(fn=func, elems=pre_x1) - tf.expand_dims(y0, 0)
-    ) / epsilon
+
+    dy_transposed = (tf.map_fn(fn=func, elems=pre_x1) - tf.expand_dims(y0, 0)) / epsilon
     # shape = [dim_x, batch_size, dim_y]
     dy = tf.transpose(dy_transposed, perm=[1, 2, 0])
 
