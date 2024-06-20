@@ -24,16 +24,22 @@ here = pathlib.Path(__file__).parent.resolve()
 setup(
     name="tf-seq2seq-losses",
     version="0.3.0",
-    description="Tensorflow implementations for seq2seq Machine Learning model loss functions",
+    description="Tensorflow implementations for (CTC) loss functions "
+                "that are fast and support second-order derivatives.",
     long_description=(here / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://github.com/alexeytochin/tf-seq2seq-losses",
+    project_urls={
+        'Documentation': "https://github.com/alexeytochin/tf-seq2seq-losses/README.md",
+        'GitHub': "https://github.com/alexeytochin/tf-seq2seq-losses",
+        'Changelog': "https://github.com/alexeytochin/tf-seq2seq-losses/CHANGELOG.md",
+    },
     author="Alexey Tochin",
     author_email="alexey.tochin@gmail.com",
     license="Apache 2.0",
     license_files=("LICENSE",),
     packages=["tf_seq2seq_losses"],
-    install_requires=["tensorflow>=2.6.1", "numpy", "cached_property"],
+    install_requires=["tensorflow>=2.6.1", "numpy"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
