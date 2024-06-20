@@ -7,6 +7,7 @@
 
 - github CI actions with unit tests.
 - `pylint` and `ruff` checks.
+- `changelog.md`.
 
 ### Bump
 
