@@ -15,17 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import unittest
-
 import numpy as np
 import tensorflow as tf
+
+from tf_seq2seq_losses.base_loss import ctc_loss_from_logproba
+from tf_seq2seq_losses.classic_ctc_loss import ClassicCtcLossData, classic_ctc_loss
+from tf_seq2seq_losses.tools import logit_to_logproba
 
 from tests.common import generate_ctc_loss_inputs
 from tests.test_ctc_losses import TestCtcLoss
 from tests.finite_difference import finite_difference_batch_jacobian
-from tf_seq2seq_losses.base_loss import ctc_loss_from_logproba
-from tf_seq2seq_losses.classic_ctc_loss import ClassicCtcLossData, classic_ctc_loss
-from tf_seq2seq_losses.tools import logit_to_logproba
 
 
 class TestClassicCtcLoss(TestCtcLoss):
@@ -393,7 +392,6 @@ class TestClassicCtcLoss(TestCtcLoss):
             tf_version_gradient, classic_version_gradient, 4
         )
 
-    @unittest.skip("fix_finite_difference")
     def test_gradient_vs_finite_difference(self):
         """Test for the comparison of the gradient with the finite difference."""
         blank_index = 0
@@ -478,7 +476,6 @@ class TestClassicCtcLoss(TestCtcLoss):
             list(hessian_analytic.shape),
         )
 
-    @unittest.skip("fix_finite_difference")
     def test_hessian_vs_finite_difference(self):
         """Test for the comparison of the Hessian with the finite difference."""
         input_dict = generate_ctc_loss_inputs(
@@ -486,21 +483,21 @@ class TestClassicCtcLoss(TestCtcLoss):
         )
         logits = input_dict["logits"]
 
-        def gradient_fn(logits):
-            with tf.GradientTape() as tape:
-                tape.watch([logits])
+        def gradient_fn(logits_):
+            with tf.GradientTape() as tape_:
+                tape_.watch([logits_])
                 loss = tf.reduce_sum(
                     classic_ctc_loss(
                         labels=input_dict["labels"],
-                        logits=logits,
+                        logits=logits_,
                         label_length=input_dict["label_length"],
                         logit_length=input_dict["logit_length"],
                         blank_index=0,
                     )
                 )
-            gradient = tape.gradient(loss, sources=logits)
+            gradient_ = tape_.gradient(loss, sources=logits_)
             # shape = [batch_size, logit_length, num_tokens]
-            return gradient
+            return gradient_
 
         hessian_numerical = finite_difference_batch_jacobian(
             func=gradient_fn, x=logits, epsilon=1e-4

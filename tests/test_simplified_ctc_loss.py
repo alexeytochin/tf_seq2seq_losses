@@ -15,19 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import unittest
-
 import numpy as np
 import tensorflow as tf
 
-from tests.common import generate_ctc_loss_inputs
-from tests.test_ctc_losses import TestCtcLoss
-from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.simplified_ctc_loss import (
     simplified_ctc_loss,
     SimplifiedCtcLossData,
 )
 from tf_seq2seq_losses.tools import logit_to_logproba
+
+from tests.common import generate_ctc_loss_inputs
+from tests.test_ctc_losses import TestCtcLoss
+from tests.finite_difference import finite_difference_batch_jacobian
 
 
 class TestSimplifiedCtcLoss(TestCtcLoss):
@@ -258,7 +257,6 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
             places=6,
         )
 
-    @unittest.skip("fix_finite_difference")
     def test_gradient_with_finite_difference(self):
         """Test for the gradient with finite difference."""
         blank_index = 0
@@ -290,7 +288,6 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
             tape.watch([logits])
             loss = tf.reduce_sum(loss_fn(logits))
         gradient_analytic = tape.gradient(loss, sources=logits)
-
         self.assert_tensors_almost_equal(gradient_numerical, gradient_analytic, 1)
 
     def test_autograph(self):
@@ -336,9 +333,9 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
                 output = simplified_ctc_loss(
                     labels, logits, label_length, logit_length, 0
                 )
-                loss = tf.reduce_mean(output)
-            gradient = tape.gradient(loss, sources=logits)
-            return loss, gradient
+                loss_ = tf.reduce_mean(output)
+            gradient_ = tape.gradient(loss_, sources=logits)
+            return loss_, gradient_
 
         loss, gradient = func()
 
@@ -356,14 +353,14 @@ class TestSimplifiedCtcLoss(TestCtcLoss):
         def func():
             with tf.GradientTape() as tape:
                 tape.watch([logits])
-                loss_samplewise = simplified_ctc_loss(
+                loss_samplewise_ = simplified_ctc_loss(
                     labels, logits, label_length, logit_length, 0
                 )
-                loss = tf.reduce_sum(loss_samplewise)
-            gradient = tape.gradient(loss, sources=logits)
-            return loss_samplewise, gradient
+                loss = tf.reduce_sum(loss_samplewise_)
+            gradient_ = tape.gradient(loss, sources=logits)
+            return loss_samplewise_, gradient_
 
-        loss_samplewise, gradient = func()
+        loss_samplewise_, gradient = func()
 
-        self.assertEqual([0], loss_samplewise.shape)
+        self.assertEqual([0], loss_samplewise_.shape)
         self.assertEqual([0, 4, 3], gradient.shape)

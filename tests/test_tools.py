@@ -20,7 +20,6 @@ import unittest
 import tensorflow as tf
 import numpy as np
 
-from tests.finite_difference import finite_difference_batch_jacobian
 from tf_seq2seq_losses.tools import (
     logsumexp,
     insert_zeros,
@@ -28,6 +27,8 @@ from tf_seq2seq_losses.tools import (
     unfold,
     expand_many_dims,
 )
+
+from tests.finite_difference import finite_difference_batch_jacobian
 
 
 class TestLogSumExp(unittest.TestCase):

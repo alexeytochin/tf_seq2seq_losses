@@ -26,9 +26,10 @@ import tensorflow as tf
 from tqdm import tqdm
 from tabulate import tabulate
 
-from tests.common import generate_ctc_loss_inputs, tf_ctc_loss
 from tf_seq2seq_losses.classic_ctc_loss import classic_ctc_loss
 from tf_seq2seq_losses.simplified_ctc_loss import simplified_ctc_loss
+
+from tests.common import generate_ctc_loss_inputs, tf_ctc_loss
 
 
 class TestBenchmarkCtcLosses(unittest.TestCase):
