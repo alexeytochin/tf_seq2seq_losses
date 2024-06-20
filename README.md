@@ -1,7 +1,7 @@
 # tf-seq2seq-losses
 Tensorflow implementations for
 [Connectionist Temporal Classification](file:///home/alexey/Downloads/Connectionist_temporal_classification_Labelling_un.pdf)
-(CTC) loss that are fast and support second-order derivatives.
+(CTC) loss functions that are fast and support second-order derivatives.
 
 ## Installation
 ```bash
@@ -15,8 +15,8 @@ Official CTC loss implementation,
 is significantly slower.
 Our implementation is approximately 30 times faster, as shown by the benchmark results:
 
-|       Name       | Forward Time (ms) | Gradient Calculation Time (ms) |                 
-|:----------------:|:-----------------:|:------------------------------:|
+|        Name        | Forward Time (ms) | Gradient Calculation Time (ms) |                 
+|:------------------:|:-----------------:|:------------------------------:|
 |  `tf.nn.ctc_loss`  |    13.2 ± 0.02    |            10.4 ± 3            |
 | `classic_ctc_loss` |   0.138 ± 0.006   |          0.28 ± 0.01           |
 | `simple_ctc_loss`  |  0.0531 ± 0.003   |         0.119 ± 0.004          |
@@ -28,8 +28,8 @@ To reproduce this benchmark, run the following command from the project root dir
 ```bash
 $ pytest -o log_cli=true --log-level=INFO tests/benchmark.py
 ```
-Here, classic_ctc_loss is the standard version of CTC loss with token collapsing, e.g., `a_bb_ccc_c -> abcc`. 
-The simple_ctc_loss is a simplified version that removes blanks trivially, e.g., `a_bb_ccc_c -> abbcccc`.
+Here, `classic_ctc_loss` is the standard version of CTC loss with token collapsing, e.g., `a_bb_ccc_c -> abcc`. 
+The `simple_ctc_loss` is a simplified version that removes blanks trivially, e.g., `a_bb_ccc_c -> abbcccc`.
 
 ### 2. Supports Second-Order Derivatives
 This implementation supports second-order derivatives without using TensorFlow's autogradient. 
