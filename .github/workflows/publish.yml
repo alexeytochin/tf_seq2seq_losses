@@ -2,7 +2,6 @@
 name: Publish to PyPI
 on:
   push:
-    branches: [ "main" ]
     tags: [ "v*" ]
 jobs:
   publish:
@@ -20,7 +19,9 @@ jobs:
           python -m pip install -U pip build
           python -m build
       - name: Publish
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_KEY }}
+          skip-existing: true
+          verbose: true
